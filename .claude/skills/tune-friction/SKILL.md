@@ -23,8 +23,12 @@ $$\dot{z} = \omega - \sigma_0 \frac{|\omega|}{I_c + (I_s - I_c) e^{-(\omega/\ome
 - Ask if there is an IP to target for openocd. If there is, add a `-i IP` flag to the `rtttest` command
 - Ask if `-r` has already been used to start the rtt server. If not, your first rttcmd will need to include this flag.
 - Require openocd running already (ask for confirmation). If it is not, notify the user and exit this task.
-- Examine `scripts/run-*.sh` and `scripts/txf-*.py`, tolling for the tests.
+- Check the current gains configured on the system. Make sure they are non-zero.
+- Examine `scripts/`, it contains tooling for the tests.
 
+**Fourth**, ensure MATLAB is running
+- If not, launch it
+- Use `startup.m` to launch the MCP server
 
 ## Test 1 - steady-state friction-velocoity map
 
@@ -56,13 +60,20 @@ This targets the `sig0` ($\sigma_0$) param
 
 ## Test 3 - pre-sliding damping
 
-This targets the `sig1` ($\sigma_1$) param
+This targets the `sig1` ($\sigma_1$) param. `sig0` is not fit anywhere in Test 2 as written, so it is folded into this test's joint fit instead (see Second, below).
 
 **First**, with the joint at rest, apply a small sinusoidal current dither sweep
-- 
+- Log-spaced frequencies: 1, 2, 5, 10, 20, 50, 100 Hz
+- Amplitude well below the breakaway current found in Test 2 (e.g. 0.15 A against a ~1.1-2.0 A breakaway band)
+- 20 cycles per frequency, using `scripts/run-sine.sh` in torque mode
+- Scale stride to the RTT link's throughput ceiling for the longer/low-frequency captures 
+  - See `module-fwpp/cheatsheet.md`'s "Trace Throughput" section
 
-**Second**, fit `sig1` and `sig2` jointly against the Test 2 presliding traces and Test 3 data by simulating the actual LuGre ODE (20 kHz fixed-step) inside `lsqnonlin`/`fmincon`
-- 
-- 
+**Second**, fit `sig0`, `sig1` and `sig2` by simulating the actual LuGre ODE (20 kHz fixed-step) inside `lsqnonlin`/`fmincon`
+- Use `scripts/txf-breakaway.py` to find each Test 2 ramp/step capture's breakaway point and export the pre-breakaway "presliding" segment (t, w, iq) to CSV; use `scripts/txf-export-csv.py` to export each Test 3 dither capture the same way
+- Fit with `scripts/fit_lugre_joint.m` (`lsqnonlin`): hold `Ic`/`Is`/`stribeck_vel` fixed from Test 1, solve for `sig0`, `sig1`, `sig2` together by simulating `scripts/lugre_predict.m`'s LuGre ODE (velocity interpolated onto a fixed 20 kHz grid, Euler-integrated, predicted current resampled back to the measurement times) against every presliding + dither trial's measured current
+- Check that `vel_fbk`'s std/max in each trial clearly exceeds the joint's noise floor; if it doesn't, `sig0`/`sig1` are not identifiable this way and should be reported as such rather than written into the final values.
+
+This only works if `vel_fbk` carries real presliding-deflection signal above the encoder noise floor
 
 **Finally**, write the final values to a report, using `reports/tune-friction-example.md` as the template.
