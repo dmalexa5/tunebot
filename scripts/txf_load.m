@@ -5,8 +5,19 @@ function [data, dt] = txf_load(txfDir)
 %   and returns DATA.<trace name> = scaled double column vector, DT = the
 %   traces' hscale (sample period, s). pos_cmd/pos_fbk/pos_rx are unwrapped
 %   from the firmware's [-pi, pi) wrap.
+%
+%   The firmware traces angles in degrees (board-drive.c @signal vscale)
+%   while everything downstream works in rad, so traces whose metadata unit
+%   is deg or deg/s are converted. mech_trace also names the feedback traces
+%   after the encoders they come from (opos/ovel, output shaft); those are
+%   aliased onto the cmd/fbk pairing, with the firmware names kept too.
 
 meta = jsondecode(fileread(fullfile(txfDir, 'metadata.json')));
+
+% char(176) is the degree sign -- spelled this way so the file's own
+% encoding can't change what it matches.
+degUnits = {char(176), [char(176) '/s']};
+fbkAliases = {'opos', 'pos_fbk'; 'ovel', 'vel_fbk'};
 
 typeMap = containers.Map( ...
     {'f32', 'i32', 'u32', 'i16', 'u16', 'i8', 'u8'}, ...
@@ -24,7 +35,15 @@ for i = 1:numel(traces)
     if isfield(tr, 'vscale'), vscale = tr.vscale; end
     voffset = 0.0;
     if isfield(tr, 'voffset'), voffset = tr.voffset; end
-    data.(tr.name) = double(raw) * vscale + voffset;
+    scaled = double(raw) * vscale + voffset;
+    if isfield(tr, 'unit') && any(strcmp(tr.unit, degUnits))
+        scaled = scaled * pi / 180;
+    end
+    data.(tr.name) = scaled;
+    alias = strcmp(tr.name, fbkAliases(:, 1));
+    if any(alias)
+        data.(fbkAliases{alias, 2}) = scaled;
+    end
     if isfield(tr, 'hscale'), dt = tr.hscale; end
 end
 

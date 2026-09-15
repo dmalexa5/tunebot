@@ -9,6 +9,16 @@ import json, math, os, struct, sys
 DT = {'f32': ('<f', 4), 'i32': ('<i', 4), 'u32': ('<I', 4),
       'i16': ('<h', 2), 'u16': ('<H', 2), 'i8': ('<b', 1), 'u8': ('<B', 1)}
 
+# The firmware traces angles in degrees (board-drive.c @signal vscale) while
+# everything below works in rad. metadata.json states each trace's unit, so
+# key the conversion off that rather than off a name list.
+DEG_UNITS = ('°', '°/s')
+
+# mech_trace names the feedback traces after the encoders they come from
+# (opos/ovel, output shaft). Alias them onto the cmd/fbk pairing used below;
+# the firmware's own names stay available too.
+FBK_ALIASES = {'opos': 'pos_fbk', 'ovel': 'vel_fbk'}
+
 # pos_cmd/pos_fbk/pos_rx are wrapped to [-pi, pi) by the firmware (single-turn
 # encoder), but the arm's rest position drifts test-to-test and can sit close
 # enough to the wrap boundary that a 0.2 rad sine crosses it -- unwrap so a
@@ -34,7 +44,12 @@ def load(txf):
         n = len(raw) // w
         vals = [v[0] for v in struct.iter_unpack(fmt, raw[:n * w])]
         vs, vo = tr.get('vscale', 1.0), tr.get('voffset', 0.0)
-        out[tr['name']] = [v * vs + vo for v in vals]
+        scaled = [v * vs + vo for v in vals]
+        if tr.get('unit') in DEG_UNITS:
+            scaled = [v * math.pi / 180.0 for v in scaled]
+        out[tr['name']] = scaled
+        if tr['name'] in FBK_ALIASES:
+            out[FBK_ALIASES[tr['name']]] = scaled
         hscale = tr.get('hscale', hscale)
     for k in POS_KEYS:
         if k in out and len(out[k]) > 1:

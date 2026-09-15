@@ -31,17 +31,18 @@ Retune the designated joint with the goal of minimizing velocity chatter while m
 
 These tests should be run at an amplitude dependant on arm type, with the highest frequency being 1 Hz and lowest frequency being 0.1 Hz. Tune at 1 Hz and 0.1 Hz until you have reached a final gains candidate, then verify with a quick frequency sweep from 0.1 -> 0.25 -> 0.5 -> 0.75 -> 1.0
 
-Set the baseline gains first using `scripts/setgains.sh`. Use this script to set all gains. When testing for ideal gains, use a bisecting/binary search to quickly converge on final candidates.
+Set the baseline gains first using `scripts/set-gains.sh`. Use this script to set all gains. When testing for ideal gains, use a bisecting/binary search to quickly converge on final candidates.
 
 Use this command, with only frequency being adjusted (single-cycle sine wave test):
 ```
-rtttest -n -s $TABLES -o psine '{"test":"servo_sine","mode":2,"freq_hz":1.0,"amp":0.138,"cycles":2}'
+scripts/run-sine.sh pos 1.0 $AMPLITUDE 2
 ```
 
-Source $TABLES at this location:
-```
-export TABLES=../module-fwpp/output/drive/none/drive-none.tables.json
-```
+Go through the scripts rather than calling `rtttest` directly: the servo loop
+takes output-shaft counts (2^32/rev), not radians, and the scripts are where
+the amplitude above gets converted. A raw `{"test":"servo_sine","amp":0.138}`
+commands 0.138 *counts* and moves nothing. They also resolve `$TABLES` and the
+`rtttest` path themselves, so neither needs exporting.
 
 Check `../cn-seamless/configs/tunables/$TUNABLE` for the untuned baseline gains, at the specified joint. Check @../module-fwpp/, specifically @../module-fwpp/src/servo.c, for the cascaded pid control structure.
 

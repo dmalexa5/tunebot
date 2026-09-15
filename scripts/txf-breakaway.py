@@ -12,10 +12,20 @@ LuGre fit.
 .txf is a directory: metadata.json lists "traces", each with a dtype,
 scaling, and a traceN.bin of raw little-endian samples.
 """
-import csv, json, os, struct, sys
+import csv, json, math, os, struct, sys
 
 DT = {'f32': ('<f', 4), 'i32': ('<i', 4), 'u32': ('<I', 4),
       'i16': ('<h', 2), 'u16': ('<H', 2), 'i8': ('<b', 1), 'u8': ('<B', 1)}
+
+# The firmware traces angles in degrees (board-drive.c @signal vscale) while
+# everything below works in rad. metadata.json states each trace's unit, so
+# key the conversion off that rather than off a name list.
+DEG_UNITS = ('°', '°/s')
+
+# mech_trace names the feedback traces after the encoders they come from
+# (opos/ovel, output shaft). Alias them onto the cmd/fbk pairing used below;
+# the firmware's own names stay available too.
+FBK_ALIASES = {'opos': 'pos_fbk', 'ovel': 'vel_fbk'}
 
 # TEST_SERVO_STEP_EDGE_SAMPLES (board-drive.c): fixed-length baseline/tail
 # around the ramp, same convention as txf-ramp.py.
@@ -31,7 +41,12 @@ def load(txf):
         n = len(raw) // w
         vals = [v[0] for v in struct.iter_unpack(fmt, raw[:n * w])]
         vs, vo = tr.get('vscale', 1.0), tr.get('voffset', 0.0)
-        out[tr['name']] = [v * vs + vo for v in vals]
+        scaled = [v * vs + vo for v in vals]
+        if tr.get('unit') in DEG_UNITS:
+            scaled = [v * math.pi / 180.0 for v in scaled]
+        out[tr['name']] = scaled
+        if tr['name'] in FBK_ALIASES:
+            out[FBK_ALIASES[tr['name']]] = scaled
         hscale = tr.get('hscale', hscale)
     return out, hscale
 
