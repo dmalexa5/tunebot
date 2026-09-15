@@ -133,9 +133,6 @@ edges would lose a cycle in velocity mode, where the sine starts and ends at zer
   litters it with `*.txf/` dirs (several are there now). `traces/`, `*.txf/`,
   and `*.bin` are gitignored, so captures are never committed — reports
   reference them by path only.
-- `set-gains.sh` is the odd one out: it sources a hardcoded
-  `/Users/dmalexa/tmp/j0-fullarm-retune/_tools/env.sh` for `$RT` instead of
-  resolving `rtttask` relative to its own directory like the other scripts.
 - `txf-breakaway.py`'s velocity threshold must sit above the joint's actual
   `vel_fbk` noise floor (~3 mrad/s std with ~14 mrad/s spikes on j1), hence the
   50 mrad/s default plus a 3-consecutive-sample sustain requirement.
