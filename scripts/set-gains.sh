@@ -5,7 +5,9 @@
 #   tqclim    A
 #   vellim    rad/s
 set -e
-source /Users/dmalexa/tmp/j0-fullarm-retune/_tools/env.sh
+
+SCRIPT_DIR=${0:A:h}
+RTTTASK=$SCRIPT_DIR/../../module-fwpp/tools/rttcmd/rtttask
 
 IP=127.0.0.1
 if [[ "$1" == "-i" ]]; then
@@ -25,8 +27,7 @@ CNT_PER_RAD=$(( 4294967296.0 / (2 * 3.14159265358979324) ))
 vel_gain(){ printf %.9e $(( $1 / CNT_PER_RAD )); }
 rad_to_cnt(){ printf %.9e $(( $1 * CNT_PER_RAD )); }
 
-cd $RT
-./rtttask -i $IP -- >/dev/null <<EOJ
+"$RTTTASK" -i "$IP" -- >/dev/null <<EOJ
 {"command":"Jx_CFG","action":"WRITE","addr":"VEL_KP","val":$(vel_gain $1)}
 {"command":"Jx_CFG","action":"WRITE","addr":"VEL_KI","val":$(vel_gain $2)}
 {"command":"Jx_CFG","action":"WRITE","addr":"VEL_KD","val":0.0}
