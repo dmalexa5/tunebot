@@ -44,36 +44,22 @@ This targets these params:
   - 0.010, 0.015, 0.022, 0.033, 0.050, 0.075, 0.100, 0.150, 0.225, 0.338, 0.507, 0.760, 0.875 rad/s
 - Use the velocity step function in `scripts/run-step.sh`
 
-**Second**, fit the stribeck function to this data with a simple nonlinear least-squares regression
-- 
-
+**Second**, fit the stribeck function to this data with a simple nonlinear least-squares regression using matlab 
+- `lsqcurvefit` on $I_{ss}(\omega) = [I_c + (I_s−I_c)·\exp(−(\omega/\omega_s)²)]·sign(\omega) + \sigma_2·\omega$
 ## Test 2 - breakaway vs. loading rate
 
 This targets the `sig0` ($\sigma_0$) param
 
 **First**, capture a series of current ramps
-- Initial current is 0.5 A, final current is 2 A
+- Initial current is 0 A, final current is 3 A
 - 0.1, 0.33, 1, 3.3, 10, 33, 100 A/s
   - use `scripts/run-ramp.sh`
 - literal current step 0 to 2.0 A
   - use `scripts/run-step.sh`
+- 5 trials per rate, both directions
 
-## Test 3 - pre-sliding damping
+**Second**, Fit this to each trial's mpos trace
+- Use rollover algorithm for mpos if neccessary
 
-This targets the `sig1` ($\sigma_1$) param. `sig0` is not fit anywhere in Test 2 as written, so it is folded into this test's joint fit instead (see Second, below).
 
-**First**, with the joint at rest, apply a small sinusoidal current dither sweep
-- Log-spaced frequencies: 1, 2, 5, 10, 20, 50, 100 Hz
-- Amplitude well below the breakaway current found in Test 2 (e.g. 0.15 A against a ~1.1-2.0 A breakaway band)
-- 20 cycles per frequency, using `scripts/run-sine.sh` in torque mode
-- Scale stride to the RTT link's throughput ceiling for the longer/low-frequency captures 
-  - See `module-fwpp/cheatsheet.md`'s "Trace Throughput" section
-
-**Second**, fit `sig0`, `sig1` and `sig2` by simulating the actual LuGre ODE (20 kHz fixed-step) inside `lsqnonlin`/`fmincon`
-- Use `scripts/txf-breakaway.py` to find each Test 2 ramp/step capture's breakaway point and export the pre-breakaway "presliding" segment (t, w, iq) to CSV; use `scripts/txf-export-csv.py` to export each Test 3 dither capture the same way
-- Fit with `scripts/fit_lugre_joint.m` (`lsqnonlin`): hold `Ic`/`Is`/`stribeck_vel` fixed from Test 1, solve for `sig0`, `sig1`, `sig2` together by simulating `scripts/lugre_predict.m`'s LuGre ODE (velocity interpolated onto a fixed 20 kHz grid, Euler-integrated, predicted current resampled back to the measurement times) against every presliding + dither trial's measured current
-- Check that `vel_fbk`'s std/max in each trial clearly exceeds the joint's noise floor; if it doesn't, `sig0`/`sig1` are not identifiable this way and should be reported as such rather than written into the final values.
-
-This only works if `vel_fbk` carries real presliding-deflection signal above the encoder noise floor
-
-**Finally**, write the final values to a report, using `reports/tune-friction-example.md` as the template.
+**Finally**, report the results to the user in a minimal, concise format. 
