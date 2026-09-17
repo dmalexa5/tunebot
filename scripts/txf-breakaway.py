@@ -3,11 +3,11 @@
 (run-ramp.sh torque), for tune-friction Test 2/3.
 
 Reports the loading rate (A/s), the current and elapsed time at breakaway
-(first run of sustain_n consecutive samples with |vel_fbk| over a threshold
-set well above the encoder noise floor -- vel_fbk noise on j1 is ~3 mrad/s
-std with spikes to ~14 mrad/s, hence the 50 mrad/s default), and writes the
-pre-breakaway "presliding" segment (t, w, iq) to a CSV for the Test 3 joint
-LuGre fit.
+(first run of sustain_n consecutive samples with |mvel_filt| over a threshold
+set above measured baseline noise), and writes the pre-breakaway segment
+(t, w, iq) for the LuGre fit. mvel_filt is the recorded filtered motor velocity,
+sign-corrected into output-shaft rad/s; no additional gearing is applied.
+The default threshold is 0.05 rad/s; measure noise before choosing it.
 
 .txf is a directory: metadata.json lists "traces", each with a dtype,
 scaling, and a traceN.bin of raw little-endian samples.
@@ -59,13 +59,15 @@ def load(txf):
 def analyze(txf, vel_threshold=0.05, sustain_n=3):
     d, dt = load(txf)
     iq_cmd, iq_fbk = d['iq_cmd'], d.get('iq_fbk', d['iq_cmd'])
-    vel_fbk = d['vel_fbk']
+    if 'mvel_filt' not in d:
+        raise ValueError('capture lacks mvel_filt; recapture with updated TRACE=MECH firmware and tables')
+    mvel_filt = d['mvel_filt']
     n = len(iq_cmd)
     if n <= 2 * EDGE:
         raise ValueError(f"capture too short ({n} samples) for a {EDGE}-sample baseline+tail")
 
     ramp = slice(EDGE, n - EDGE)
-    ramp_cmd, ramp_fbk, ramp_vel = iq_cmd[ramp], iq_fbk[ramp], vel_fbk[ramp]
+    ramp_cmd, ramp_fbk, ramp_vel = iq_cmd[ramp], iq_fbk[ramp], mvel_filt[ramp]
     nramp = len(ramp_cmd)
     dur = nramp * dt
     rate = (ramp_cmd[-1] - ramp_cmd[0]) / dur if dur else float('nan')
@@ -77,7 +79,7 @@ def analyze(txf, vel_threshold=0.05, sustain_n=3):
             break
     if breakaway_i is None:
         raise ValueError(
-            f"no breakaway detected (|vel_fbk| never sustained {vel_threshold} rad/s "
+            f"no breakaway detected (|mvel_filt| never sustained {vel_threshold} rad/s "
             f"for {sustain_n} consecutive samples)")
 
     presliding_t = [i * dt for i in range(breakaway_i + 1)]

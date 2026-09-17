@@ -1,19 +1,33 @@
 ---
 name: tune-friction
-description: Identify an unloaded joint's Stribeck and LuGre friction parameters from RTT captures using MATLAB.
+description: Identify an unloaded joint's Stribeck and LuGre friction parameters from RTT captures using Python and MATLAB.
 ---
 
 # Tune friction
 
 Read `CLAUDE.md` and `cheatsheet.md` for setup, units, and capture limits.
 Obtain missing session details together: unloaded joint, capture directory,
-target IP, and RTT server state. Verify gains and MATLAB availability.
+target IP, and RTT server state. Verify gains and the Python environment; MATLAB is needed only for LuGre fits.
+
+Use captures with recorded `mvel_filt`: the firmware's filtered motor velocity,
+sign-corrected and scaled into output-shaft rad/s. This is the friction input
+for `FRIC_SRC=2` with `FRIC_LPF=1` (no additional smoothing). Require updated
+`TRACE=MECH` firmware and capture tables exposing that channel. Reject captures
+missing it; never substitute `ovel`, `vel_fbk`, raw `mvel`, or position-derived
+velocity. Do not apply another gear-ratio conversion. Identify with compensation
+disabled (omit `-F`); confirm `iq_fric` is zero when recorded.
 
 ## Steady-state map: Ic, Is, stribeck_vel, sig2
 
-Capture 1000 ms velocity holds with `scripts/run-step.sh`, default stride 12:
+Capture positive and negative 1000 ms velocity holds with `scripts/run-step.sh`,
+default stride 12:
 0.010, 0.015, 0.022, 0.033, 0.050, 0.075, 0.100, 0.150, 0.225, 0.338,
-0.507, 0.760, 0.875 rad/s. Fit with `scripts/fit_stribeck.m` (300 ms settle skip).
+0.507, 0.760, 0.875 rad/s (output-coordinate command magnitudes).
+Fit with `.venv/bin/python scripts/fit_stribeck.py 'traces/session/vhold.*.txf'`
+(300 ms settle skip; JSON output retains parameters and signed measurements).
+The fit uses mean `mvel_filt` and `iq_fbk`, speed magnitude and direction-aligned
+current. Compare retained `signed_w`/`signed_I` pairs between directions and
+report disagreement rather than hiding it in the shared symmetric fit.
 Do not claim a resolved Stribeck knee if the data does not show one.
 
 ## Presliding: sig0
@@ -25,12 +39,16 @@ A 2 A step may not exceed breakaway; record failures rather than forcing a fit.
 Rates 0.1 and 0.33 A/s exceed the current capture limit; report their omission.
 
 Detect breakaway with `scripts/txf-breakaway.py`, using a threshold above measured
-noise. Reject overflowed captures and trials that end before breakaway.
+`mvel_filt` baseline noise. Reject overflowed captures and trials that end
+before breakaway.
 Fit presliding traces with the LuGre model in `scripts/lugre_predict.m`, holding
-steady-state parameters fixed. Prefer unwrapped motor position referred through
-a measured gear ratio when velocity feedback cannot resolve presliding motion.
+steady-state parameters fixed and CSV `w` taken directly from `mvel_filt`.
+If that channel cannot resolve presliding motion, report parameters as
+unidentified; do not replace it with position-derived velocity.
 `fit_lugre_joint.m` fits sig2 jointly; do not trust it to identify viscous damping
 from presliding data alone. Report sig0/sig1 as unidentified when unsupported.
 
 Move captures to the session directory. Report parameters with units, uncertainty
-or identification limits, test conditions, and capture paths.
+or identification limits, test conditions, and capture paths. State the motor
+sensor source and output-referred units: Ic/Is in A, stribeck_vel in rad/s,
+sig0 in A/rad, and sig1/sig2 in A/(rad/s).

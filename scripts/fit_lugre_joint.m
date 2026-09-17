@@ -6,6 +6,8 @@ function result = fit_lugre_joint(csvFiles, Ic, Is, stribeck_vel, p0, fs_ode)
 %
 %   csvFiles: cellstr of (t, w, iq) CSV paths -- the presliding segments
 %   from txf-breakaway.py and the dither captures from txf-export-csv.py.
+%   CSV w must be recorded mvel_filt in output-shaft rad/s, not ovel,
+%   vel_fbk, raw mvel, or position-derived velocity.
 %   Ic, Is, stribeck_vel come from fit_stribeck (Test 1) and are held
 %   fixed here.
 

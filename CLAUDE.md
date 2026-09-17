@@ -3,7 +3,8 @@
 Host-side RTT capture and analysis tools for CNS drive joints; no build step.
 Step/ramp/sine Python analyzers use only the standard library. Chirp analysis
 requires NumPy and Matplotlib (`.venv/bin/python -m pip install -r requirements.txt`).
-MATLAB fits require Optimization Toolbox.
+Python Stribeck fitting requires SciPy from `requirements.txt`.
+MATLAB LuGre fits require Optimization Toolbox.
 
 ## Setup
 

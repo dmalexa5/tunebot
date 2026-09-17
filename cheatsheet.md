@@ -61,16 +61,26 @@ scripts/txf-step.py capture.txf vel
 scripts/txf-ramp.py capture.txf torque
 scripts/txf-sine.py capture.txf 1.0 pos
 scripts/txf-breakaway.py capture.txf 0.05 presliding.csv 3
-scripts/txf-export-csv.py capture.txf ovel,iq_fbk output.csv
+scripts/txf-export-csv.py capture.txf mvel_filt,iq_fbk output.csv
 ```
 
 Sine analysis supports `pos`/`vel`. `iq_jitter` is RMS first-difference of `iq_cmd`;
 compare it at the same stride and waveform. Prefer sine captures for chatter.
-Set breakaway velocity thresholds above measured noise; defaults are 0.05 rad/s
-and 3 consecutive samples. CSV export adds `t`; joint LuGre fits require headers `t,w,iq`.
+Set breakaway velocity thresholds above measured `mvel_filt` baseline noise;
+defaults are 0.05 rad/s and 3 consecutive samples. Friction tools require recorded `mvel_filt` from
+updated `TRACE=MECH` firmware/tables; missing channels require new captures.
+This filtered motor-derived signal is already sign-corrected output-shaft rad/s;
+do not divide by a gear ratio or substitute other velocity signals. Identify
+with compensation disabled (omit `-F`). Use both signs of velocity holds.
+CSV export adds `t`; joint LuGre fits require headers `t,w,iq`.
+For exported CSVs, rename `mvel_filt` to `w` and `iq_fbk` to `iq`, keeping values
+unchanged; breakaway exports already use these headers.
+
+```sh
+.venv/bin/python scripts/fit_stribeck.py 'traces/session/vhold.*.txf' # skips first 300 ms
+```
 
 ```matlab
 addpath('scripts');
-result = fit_stribeck('traces/session/vhold.*.txf'); % skips first 300 ms
 result = fit_lugre_joint({'presliding.csv'}, Ic, Is, stribeck_vel);
 ```

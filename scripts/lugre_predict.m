@@ -6,6 +6,9 @@ function I_pred = lugre_predict(t, w, sig0, sig1, sig2, Ic, Is, ws, fs_ode)
 %       zdot = w - sig0*|w|/g(w)*z,   g(w) = Ic + (Is-Ic)*exp(-(w/ws)^2)
 %       I_f  = sig0*z + sig1*zdot + sig2*w
 %
+%   W must be recorded mvel_filt (filtered, sign-corrected motor velocity in
+%   output-shaft rad/s), using the same basis as the steady-state parameters.
+%   Do not substitute output feedback or position-derived velocity.
 %   W is interpolated onto a uniform fs_ode grid (default 20 kHz, per the
 %   tune-friction skill), integrated forward with explicit Euler from
 %   z(1)=0, then the predicted current is interpolated back onto T.
