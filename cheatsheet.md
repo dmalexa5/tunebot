@@ -10,6 +10,7 @@ Use `set-gains.sh` for gain conversion too.
 run-step.sh  [-i IP] [-r] [-F] mode step hold_ms [base] [stride] [prefix]
 run-ramp.sh  [-i IP] [-r] [-F] mode delta duration_ms [start] [stride] [prefix]
 run-sine.sh  [-i IP] [-r] [-F] mode freq_hz amp [cycles] [stride] [prefix]
+run-chirp.sh [-i IP] [-r] [--delay SEC] [--rest-threshold RAD_S] amplitude_A f0_hz f1_hz duration_ms repeats stride session_dir
 set-gains.sh [-i IP] vkp vki pkp pki [tqclim] [vellim]
 clear-faults.sh [-i IP] [-r]
 ```
@@ -25,10 +26,35 @@ clear-faults.sh [-i IP] [-r]
   At stride 20: 3 cycles at 1 Hz, 2 at 0.75 Hz, 1 at 0.5 Hz.
   Pass the sine wrapper's printed realized frequency to the analyzer.
 - Raw `rtttest` position/velocity amplitudes use counts/counts per second,
-  not radians. For tests without wrappers (chirps), consult
+  not radians. For tests without wrappers, consult
   `../module-fwpp/cheatsheet.md` and manage control mode and stopping yourself.
 
 ## Analysis
+
+Chirp tests use `.venv/bin/python` with `requirements.txt` installed. Use a new
+`traces/<session>/` directory and at least two repeats. The wrapper captures
+identical zero-DC, constant-amplitude logarithmic `iq` chirps in `0TQ`, checks
+baseline rest, and stops on invalid captures. Keep `f1_hz` below one-quarter of
+`20000 / stride`; pads and chirp must fit 65534 ticks. Stride 2 truncates the
+`TRACE=MECH` stream; use 4 or more, which caps `f1_hz` near 1250 Hz. It saves
+raw captures and one `chirp-*.0000.png` per capture: magnitude and phase for `iq_fbk`, `mvel`,
+`ovel`, `mpos`, and `opos` relative to `iq_cmd`, using signed motor/output
+ratio -509.7, with no averaging between captures. Single-record coherence is
+omitted because it would be trivially one.
+Default sweep: 10–1000 Hz, stride 4, 3268 ms. This is the longest integer-ms
+duration fitting the timeline: `3268 * 20 + 2 * 20 * 4 = 65520` ticks;
+3269 ms would exceed 65534. The slower sweep gives more cycles per frequency
+interval, but does not guarantee settling or remove position endpoint leakage.
+
+```sh
+run-chirp.sh 0.3 10 1000 3268 5 4 traces/session
+```
+
+To reanalyze captures:
+
+```sh
+.venv/bin/python scripts/txf-chirp.py traces/session/chirp-*.txf --amplitude 0.3 --f0 10 --f1 1000 --duration-ms 3268 --repeats 5 --stride 4
+```
 
 ```sh
 scripts/txf-step.py capture.txf vel

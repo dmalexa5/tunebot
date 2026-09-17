@@ -1,7 +1,9 @@
 # Tunebot
 
 Host-side RTT capture and analysis tools for CNS drive joints; no build step.
-Python analyzers use only the standard library. MATLAB fits require Optimization Toolbox.
+Step/ramp/sine Python analyzers use only the standard library. Chirp analysis
+requires NumPy and Matplotlib (`.venv/bin/python -m pip install -r requirements.txt`).
+MATLAB fits require Optimization Toolbox.
 
 ## Setup
 
@@ -15,7 +17,8 @@ Python analyzers use only the standard library. MATLAB fits require Optimization
 
 See [cheatsheet.md](cheatsheet.md) for commands and capture constraints.
 Workflows: [chatter](.claude/skills/tune-chatter/SKILL.md),
-[friction](.claude/skills/tune-friction/SKILL.md).
+[friction](.claude/skills/tune-friction/SKILL.md),
+[chirp](.claude/skills/test-chirp/SKILL.md).
 
 ## Analysis invariants
 
