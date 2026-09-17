@@ -87,6 +87,8 @@ stop_motion(){
 	if (( STOPPED )); then return 0; fi
 	STOPPED=1
 	"$RTTTASK" -i "$IP" '{"command":"Jx_STATUS","action":"WRITE","mode":"0TQ"}' >/dev/null 2>&1 || true
+	# 0TQ disables the cascade but leaves the direct current command intact.
+	"$RTTTASK" -i "$IP" '{"command":"Jx_IDQ","action":"WRITE","id":0,"iq":0,"mvel":0,"mpos":0}' >/dev/null 2>&1 || true
 }
 trap 'stop_motion; exit 130' INT TERM
 trap stop_motion EXIT
