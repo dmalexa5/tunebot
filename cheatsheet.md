@@ -13,6 +13,7 @@ run-sine.sh  [-i IP] [-r] [-F] mode freq_hz amp [cycles] [stride] [prefix]
 run-chirp.sh [-i IP] [-r] [--delay SEC] [--rest-threshold RAD_S] amplitude_A f0_hz f1_hz duration_ms repeats stride session_dir
 set-gains.sh [-i IP] vkp vki pkp pki [tqclim] [vellim]
 clear-faults.sh [-i IP] [-r]
+.venv/bin/python scripts/test-tracking.py [-i IP] [-r] [-F] traces/session
 ```
 
 - `mode`: `pos`, `vel`, or `torque`. Default IP: `127.0.0.1`.
@@ -30,6 +31,13 @@ clear-faults.sh [-i IP] [-r]
   `../module-fwpp/cheatsheet.md` and manage control mode and stopping yourself.
 
 ## Analysis
+
+Tracking tests capture ten evenly spaced fixed frequencies from 0.1 to 0.6 Hz
+at 0.25 rad peak amplitude, each for 3 seconds at stride 20. They use equal
+`signal_chirp` endpoints to allow partial-cycle sines below the `signal_sine`
+period limit. One `tracking.png` plots peak and mean absolute position error
+over the entire driven window, including startup, in mrad versus Hz. Replot with
+`.venv/bin/python scripts/test-tracking.py --analyze traces/session`.
 
 Chirp tests use `.venv/bin/python` with `requirements.txt` installed. Use a new
 `traces/<session>/` directory and at least two repeats. The wrapper captures

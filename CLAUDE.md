@@ -3,6 +3,7 @@
 Host-side RTT capture and analysis tools for CNS drive joints; no build step.
 Step/ramp/sine Python analyzers use only the standard library. Chirp analysis
 requires NumPy and Matplotlib (`.venv/bin/python -m pip install -r requirements.txt`).
+Tracking tests require Matplotlib from the same requirements.
 Python Stribeck fitting requires SciPy from `requirements.txt`.
 MATLAB LuGre fits require Optimization Toolbox.
 
@@ -19,7 +20,8 @@ MATLAB LuGre fits require Optimization Toolbox.
 See [cheatsheet.md](cheatsheet.md) for commands and capture constraints.
 Workflows: [chatter](.claude/skills/tune-chatter/SKILL.md),
 [friction](.claude/skills/tune-friction/SKILL.md),
-[chirp](.claude/skills/test-chirp/SKILL.md).
+[chirp](.claude/skills/test-chirp/SKILL.md),
+[tracking](.claude/skills/test-tracking/SKILL.md).
 
 ## Analysis invariants
 
