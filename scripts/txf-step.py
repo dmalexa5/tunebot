@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Numeric metrics from a .txf capture of test_servo_step.
+"""Numeric metrics from a .txf capture of signal_step (run-step.sh).
 
 .txf is a directory: metadata.json lists "traces", each with a dtype,
 scaling, and a traceN.bin of raw little-endian samples.
@@ -16,16 +16,22 @@ DEG_UNITS = ('°', '°/s')
 
 # mech_trace names the feedback traces after the encoders they come from
 # (opos/ovel, output shaft). Alias them onto the cmd/fbk pairing used below;
-# the firmware's own names stay available too.
+# the firmware's own names stay available too. An alias never overwrites a
+# trace the firmware publishes under that name: mech_trace now carries its own
+# vel_fbk -- the velocity the loop actually closes on, which is the *rotor*
+# side through a 500 Hz biquad when SERVO_FLAGS selects VEL_SRC_MENC, and only
+# equals ovel in the default output-encoder configuration.
 FBK_ALIASES = {'opos': 'pos_fbk', 'ovel': 'vel_fbk'}
 
 # pos_cmd/pos_fbk/pos_rx are wrapped to [-pi, pi) by the firmware (single-turn
 # encoder); unwrap so a wrap crossing doesn't show up as a spurious ~2*pi step.
 POS_KEYS = ('pos_cmd', 'pos_fbk', 'pos_rx')
 
-# TEST_SERVO_STEP_EDGE_SAMPLES (board-drive.c): the baseline before the step
-# and the tail after it falls back are always exactly this many pushed
-# samples, whatever the stride -- so the step edges sit at fixed indices.
+# The run-*.sh wrappers ask signal_step for start_pad = end_pad =
+# EDGE*decimation servo ticks, so the baseline before the step and the tail
+# after it are always exactly this many pushed samples, whatever the stride.
+# The step edges therefore sit at fixed indices and are never detected from
+# the data.
 EDGE = 20
 
 MODE_KEYS = {'pos': ('pos_cmd', 'pos_fbk'), 'vel': ('vel_cmd', 'vel_fbk'),
@@ -54,9 +60,10 @@ def load(txf):
         if tr.get('unit') in DEG_UNITS:
             scaled = [v * math.pi / 180.0 for v in scaled]
         out[tr['name']] = scaled
-        if tr['name'] in FBK_ALIASES:
-            out[FBK_ALIASES[tr['name']]] = scaled
         hscale = tr.get('hscale', hscale)
+    for src, dst in FBK_ALIASES.items():
+        if src in out and dst not in out:
+            out[dst] = out[src]
     for k in POS_KEYS:
         if k in out and len(out[k]) > 1:
             out[k] = unwrap(out[k])

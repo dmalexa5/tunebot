@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__matlab__check_matlab_code",
+      "mcp__matlab__detect_matlab_toolboxes",
+      "Bash(git submodule status)",
+      "Bash(git submodule status *)",
+      "Bash(arm-none-eabi-nm *)",
+      "Bash(sips -g *)",
+      "Bash(scripts/txf-step.py *)",
+      "Bash(scripts/txf-ramp.py *)",
+      "Bash(scripts/txf-sine.py *)"
+    ]
+  }
+}

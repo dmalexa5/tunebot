@@ -10,7 +10,12 @@ function [data, dt] = txf_load(txfDir)
 %   while everything downstream works in rad, so traces whose metadata unit
 %   is deg or deg/s are converted. mech_trace also names the feedback traces
 %   after the encoders they come from (opos/ovel, output shaft); those are
-%   aliased onto the cmd/fbk pairing, with the firmware names kept too.
+%   aliased onto the cmd/fbk pairing, with the firmware names kept too. An
+%   alias never overwrites a trace the firmware publishes under that name:
+%   mech_trace now carries its own vel_fbk -- the velocity the loop actually
+%   closes on, which is the rotor side through a 500 Hz biquad when
+%   SERVO_FLAGS selects VEL_SRC_MENC, and only equals ovel in the default
+%   output-encoder configuration.
 
 meta = jsondecode(fileread(fullfile(txfDir, 'metadata.json')));
 
@@ -40,11 +45,15 @@ for i = 1:numel(traces)
         scaled = scaled * pi / 180;
     end
     data.(tr.name) = scaled;
-    alias = strcmp(tr.name, fbkAliases(:, 1));
-    if any(alias)
-        data.(fbkAliases{alias, 2}) = scaled;
-    end
     if isfield(tr, 'hscale'), dt = tr.hscale; end
+end
+
+for i = 1:size(fbkAliases, 1)
+    src = fbkAliases{i, 1};
+    dst = fbkAliases{i, 2};
+    if isfield(data, src) && ~isfield(data, dst)
+        data.(dst) = data.(src);
+    end
 end
 
 posKeys = {'pos_cmd', 'pos_fbk', 'pos_rx'};

@@ -25,6 +25,11 @@ $$\dot{z} = \omega - \sigma_0 \frac{|\omega|}{I_c + (I_s - I_c) e^{-(\omega/\ome
 - Require openocd running already (ask for confirmation). If it is not, notify the user and exit this task.
 - Check the current gains configured on the system. Make sure they are non-zero.
 - Examine `scripts/`, it contains tooling for the tests.
+- Note the run-length limit: the firmware's waveform engine counts its
+  timeline in 20 kHz servo ticks in a `uint16`, so **no single capture can
+  exceed ~3.27 s** including its pads. `run-step.sh` / `run-ramp.sh` refuse
+  anything longer rather than let the firmware truncate it silently. The
+  ramp rates below are chosen around that limit.
 
 **Fourth**, ensure MATLAB is running
 - If not, launch it
@@ -43,6 +48,9 @@ This targets these params:
 - Go from 0.01 to 0.875 rad/s with a fixed ratio of 1.5x per step
   - 0.010, 0.015, 0.022, 0.033, 0.050, 0.075, 0.100, 0.150, 0.225, 0.338, 0.507, 0.760, 0.875 rad/s
 - Use the velocity step function in `scripts/run-step.sh`
+- 1000 ms holds at the default stride 12 fit the tick budget. The script
+  selects `MODE_VEL` and drops back to `0TQ` itself — the waveform engine
+  does neither, and it would otherwise leave the joint servoing.
 
 **Second**, fit the stribeck function to this data with a simple nonlinear least-squares regression using matlab 
 - `lsqcurvefit` on $I_{ss}(\omega) = [I_c + (I_s−I_c)·\exp(−(\omega/\omega_s)²)]·sign(\omega) + \sigma_2·\omega$
@@ -52,11 +60,18 @@ This targets the `sig0` ($\sigma_0$) param
 
 **First**, capture a series of current ramps
 - Initial current is 0 A, final current is 3 A
-- 0.1, 0.33, 1, 3.3, 10, 33, 100 A/s
-  - use `scripts/run-ramp.sh`
+- 1, 3.3, 10, 33, 100 A/s
+  - use `scripts/run-ramp.sh`; `torque` is now a direct `iq` command with the
+    cascade off, so `VEL_TQC_LIM` does not clamp it — only `FOC_I_TRIP` does
 - literal current step 0 to 2.0 A
   - use `scripts/run-step.sh`
 - 5 trials per rate, both directions
+
+The 0.1 and 0.33 A/s rates this test used to cover are **no longer
+reachable**: a 0-to-3 A ramp at 0.1 A/s is 30 s, and the engine caps a run at
+~3.27 s. 1 A/s (3 s) is the slowest rate that fits. Say so in the report
+rather than substituting a different rate silently — the rate dependence is
+what identifies `sig0`, so losing the bottom two decades weakens it.
 
 **Second**, Fit this to each trial's mpos trace
 - Use rollover algorithm for mpos if neccessary

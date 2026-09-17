@@ -3,7 +3,7 @@ function result = fit_stribeck(txfGlob, settle_s)
 %captures (tune-friction Test 1).
 %   result = FIT_STRIBECK('traces/j1-friction-tune/vstep.*.txf')
 %
-%   Each match is a servo_step capture (mode=vel) from run-step.sh: settle,
+%   Each match is a signal_step capture (mode=vel) from run-step.sh: pad,
 %   hold at a commanded velocity, fall back. At steady state (dz/dt = 0)
 %   the LuGre ODE's z term reduces to g(w)/sigma0, so the measured current
 %   collapses to
@@ -13,11 +13,11 @@ function result = fit_stribeck(txfGlob, settle_s)
 %
 %   Steady-state velocity/current per capture are the mean of vel_fbk/
 %   iq_fbk over the hold window (skipping the fixed 20-sample
-%   baseline/tail, TEST_SERVO_STEP_EDGE_SAMPLES), after discarding an
-%   initial SETTLE_S of the hold to clear the velocity loop's transient --
-%   empirically ~300 ms on j1 (a 100 mrad/s probe showed 51% overshoot and
-%   a slowly-decaying oscillation, not a clean fast settle), not the
-%   fixed-length baseline/tail's few-sample edge.
+%   baseline/tail run-step.sh's start_pad/end_pad produce), after
+%   discarding an initial SETTLE_S of the hold to clear the velocity loop's
+%   transient -- empirically ~300 ms on j1 (a 100 mrad/s probe showed 51%
+%   overshoot and a slowly-decaying oscillation, not a clean fast settle),
+%   not the fixed-length baseline/tail's few-sample edge.
 
 if nargin < 2 || isempty(settle_s), settle_s = 0.3; end
 

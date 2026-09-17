@@ -29,20 +29,38 @@ Retune the designated joint with the goal of minimizing velocity chatter while m
 
 **Next**, run the test.
 
-These tests should be run at an amplitude dependant on arm type, with the highest frequency being 1 Hz and lowest frequency being 0.1 Hz. Tune at 1 Hz and 0.1 Hz until you have reached a final gains candidate, then verify with a quick frequency sweep from 0.1 -> 0.25 -> 0.5 -> 0.75 -> 1.0
+These tests should be run at an amplitude dependant on arm type. **The
+firmware's waveform engine counts its timeline in 20 kHz servo ticks in a
+`uint16`, so a whole run — pads included — cannot exceed ~3.27 s.** That puts
+a floor of ~0.31 Hz on a single-cycle sine and rules out the 0.1 Hz and
+0.25 Hz points this skill used to tune at. Work the range the engine can
+actually reach: tune at 1 Hz and 0.5 Hz until you have a final gains
+candidate, then verify with a sweep of 0.5 -> 0.75 -> 1.0 Hz. `run-sine.sh`
+refuses anything out of range and prints the realized frequency — pass that
+number to `scripts/txf-sine.py`, not the requested one.
+
+Cycle counts are capped by the same budget: at stride 20, 3 cycles at 1 Hz,
+2 at 0.75 Hz, 1 at 0.5 Hz.
 
 Set the baseline gains first using `scripts/set-gains.sh`. Use this script to set all gains. When testing for ideal gains, use a bisecting/binary search to quickly converge on final candidates.
 
-Use this command, with only frequency being adjusted (single-cycle sine wave test):
+Use this command, with only frequency being adjusted:
 ```
 scripts/run-sine.sh pos 1.0 $AMPLITUDE 2
 ```
 
+`run-sine.sh` selects `MODE_POS` itself and returns the joint to `0TQ`
+afterwards; the waveform engine does neither. If the friction compensator is
+meant to stay on across a capture, add `-F` — writing a mode otherwise
+rebuilds the whole ctrl word and clears `FEATURE_FRIC_COMP`.
+
 Go through the scripts rather than calling `rtttest` directly: the servo loop
 takes output-shaft counts (2^32/rev), not radians, and the scripts are where
-the amplitude above gets converted. A raw `{"test":"servo_sine","amp":0.138}`
-commands 0.138 *counts* and moves nothing. They also resolve `$TABLES` and the
-`rtttest` path themselves, so neither needs exporting.
+the amplitude above gets converted. A raw
+`{"test":"signal_sine","signal":"pos","amplitude":0.138}` commands 0.138
+*counts* and moves nothing. The scripts also select and clear the control
+mode, size the capture pads, and resolve `$TABLES` and the `rtttest` path
+themselves.
 
 Check `../cn-seamless/configs/tunables/$TUNABLE` for the untuned baseline gains, at the specified joint. Check @../module-fwpp/, specifically @../module-fwpp/src/servo.c, for the cascaded pid control structure.
 

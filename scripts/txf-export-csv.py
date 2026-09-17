@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """Dump named traces from a .txf capture to a CSV (t, <trace>, ...).
 
-Used for tune-friction Test 3 to hand the dither-sweep captures (servo_sine,
-mode=torque) to the MATLAB joint LuGre fit as plain (t, w, iq) data,
-mirroring the presliding CSVs txf-breakaway.py writes for Test 2.
+Used for tune-friction Test 3 to hand the dither-sweep captures
+(run-sine.sh torque, i.e. signal_sine on iq) to the MATLAB joint LuGre fit as
+plain (t, w, iq) data, mirroring the presliding CSVs txf-breakaway.py writes
+for Test 2.
 """
 import csv, json, math, os, struct, sys
 
@@ -17,7 +18,11 @@ DEG_UNITS = ('°', '°/s')
 
 # mech_trace names the feedback traces after the encoders they come from
 # (opos/ovel, output shaft). Alias them onto the cmd/fbk pairing used below;
-# the firmware's own names stay available too.
+# the firmware's own names stay available too. An alias never overwrites a
+# trace the firmware publishes under that name: mech_trace now carries its own
+# vel_fbk -- the velocity the loop actually closes on, which is the *rotor*
+# side through a 500 Hz biquad when SERVO_FLAGS selects VEL_SRC_MENC, and only
+# equals ovel in the default output-encoder configuration.
 FBK_ALIASES = {'opos': 'pos_fbk', 'ovel': 'vel_fbk'}
 
 
@@ -34,9 +39,10 @@ def load(txf):
         if tr.get('unit') in DEG_UNITS:
             scaled = [v * math.pi / 180.0 for v in scaled]
         out[tr['name']] = scaled
-        if tr['name'] in FBK_ALIASES:
-            out[FBK_ALIASES[tr['name']]] = scaled
         hscale = tr.get('hscale', hscale)
+    for src, dst in FBK_ALIASES.items():
+        if src in out and dst not in out:
+            out[dst] = out[src]
     return out, hscale
 
 
