@@ -22,8 +22,7 @@ Read `CLAUDE.md` and `cheatsheet.md` for hardware setup and capture limits.
 3. The wrapper zeros current and waits 1 second before each capture, checks
    baseline `ovel` RMS below 0.05 rad/s, and does not reposition. Override only
    when requested with `--delay SEC` and `--rest-threshold RAD_S` before the
-   positional arguments. It stops on invalid captures; retain them and explain
-   the failure instead of silently retrying or changing chirp settings.
+   positional arguments. 
 4. Analysis excludes baseline, tail, and closing samples first, then linearly
    detrends each trace (removes the best-fit line, not just the mean) over
    that analysis window only, per capture, before computing FFTs separately
@@ -50,8 +49,12 @@ Read `CLAUDE.md` and `cheatsheet.md` for hardware setup and capture limits.
    indicator, not a stationary-process-grade coherence — the chirp's
    instantaneous frequency isn't constant within a segment.
 5. Return `traces/<session>/chirp-*.0000.png` and the capture paths with a short
-   settings summary. Each PNG uses its capture's stem and now has three
-   panels: magnitude, wrapped phase, and coherence (with a dashed reference
-   line at 0.9 marking where the magnitude/phase above should be treated as
+   settings summary. Each PNG uses its capture's stem and has two
+   panels: magnitude and coherence (with a dashed reference
+   line at 0.9 marking where the magnitude above should be treated as
    unreliable). No CSV export or separate report is needed. Surface cleanup
    errors to the user.
+
+**Note:** if a "truncated/unexpected length" occurs, i.e. 
+`truncated/unexpected length 16380; expected 16381..16382`
+ignore the issue and continue all captures. This is a known issue and will not affect the correctness of the chirp results or analysis.

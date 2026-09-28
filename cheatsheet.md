@@ -45,10 +45,10 @@ identical zero-DC, constant-amplitude logarithmic `iq` chirps in `0TQ`, checks
 baseline rest, and stops on invalid captures. Keep `f1_hz` below one-quarter of
 `20000 / stride`; pads and chirp must fit 65534 ticks. Stride 2 truncates the
 `TRACE=MECH` stream; use 4 or more, which caps `f1_hz` near 1250 Hz. It saves
-raw captures and one `chirp-*.0000.png` per capture: magnitude and phase for `iq_fbk`, `mvel`,
+raw captures and one `chirp-*.0000.png` per capture: magnitude and coherence for `iq_fbk`, `mvel`,
 `ovel`, `mpos`, and `opos` relative to `iq_cmd`, using signed motor/output
-ratio -509.7, with no averaging between captures. Single-record coherence is
-omitted because it would be trivially one.
+ratio -509.7, with no averaging between captures. Coherence is a Welch
+estimate from 50%-overlap Hann segments within each capture.
 Default sweep: 10–1000 Hz, stride 4, 3268 ms. This is the longest integer-ms
 duration fitting the timeline: `3268 * 20 + 2 * 20 * 4 = 65520` ticks;
 3269 ms would exceed 65534. The slower sweep gives more cycles per frequency

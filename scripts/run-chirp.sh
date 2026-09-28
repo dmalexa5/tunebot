@@ -1,5 +1,5 @@
 #!/bin/zsh
-# run-chirp.sh [-i IP] [-r] [--delay SEC] [--rest-threshold RAD_S]
+# run-chirp.sh [-i IP] [-r] [--delay SEC] [--rest-threshold RAD_S] [--taper FRACTION]
 #   amplitude_A f0_hz f1_hz duration_ms repeats stride session_dir
 set -e
 
@@ -12,17 +12,19 @@ IP=127.0.0.1
 RFLAG=()
 DELAY=1
 REST_THRESHOLD=0.05
+TAPER=()
 while [[ "$1" == -* ]]; do
 	case "$1" in
 		-i) IP=$2; shift 2 ;;
 		-r) RFLAG=(-r); shift ;;
 		--delay) DELAY=$2; shift 2 ;;
 		--rest-threshold) REST_THRESHOLD=$2; shift 2 ;;
+		--taper) TAPER=(--taper "$2"); shift 2 ;;
 		*) echo "unknown flag: $1" >&2; exit 1 ;;
 	esac
 done
 if (( $# != 7 )); then
-	echo "usage: run-chirp.sh [-i IP] [-r] [--delay SEC] [--rest-threshold RAD_S] amplitude_A f0_hz f1_hz duration_ms repeats stride session_dir" >&2
+	echo "usage: run-chirp.sh [-i IP] [-r] [--delay SEC] [--rest-threshold RAD_S] [--taper FRACTION] amplitude_A f0_hz f1_hz duration_ms repeats stride session_dir" >&2
 	exit 1
 fi
 AMP=$1
@@ -81,4 +83,4 @@ for (( trial=1; trial<=REPEATS; trial++ )); do
 	IN_FLIGHT=0
 	CAPTURES+=("$FOUND[1]")
 done
-"$PYTHON" "$SCRIPT_DIR/txf-chirp.py" $SETTINGS $CAPTURES --output-dir "$SESSION"
+"$PYTHON" "$SCRIPT_DIR/txf-chirp.py" $SETTINGS $TAPER $CAPTURES --output-dir "$SESSION"

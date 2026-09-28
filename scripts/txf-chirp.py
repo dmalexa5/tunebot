@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Plot each current chirp's frequency-response magnitude and phase."""
+"""Plot each current chirp's frequency-response magnitude and coherence."""
 import argparse
 import json
 from pathlib import Path
@@ -9,6 +9,7 @@ import numpy as np
 
 SERVO_HZ = 20000
 EDGE = 20
+SEGMENTS = 7
 GEAR_RATIO = -509.7
 SIGNALS = ('iq_cmd', 'iq_fbk', 'mvel', 'ovel', 'mpos', 'opos')
 DT = {'f32': '<f4', 'i32': '<i4', 'u32': '<u4', 'i16': '<i2',
@@ -25,6 +26,8 @@ def validate_settings(args):
         raise ValueError('duration must be positive integer ms; stride must be 1..255')
     if args.repeats < 2 or args.delay < 0 or args.rest_threshold <= 0:
         raise ValueError('require repeats >= 2, delay >= 0, and rest threshold > 0')
+    if not 0 <= args.taper <= 1:
+        raise ValueError('taper fraction must be 0..1')
     if args.f1 >= SERVO_HZ / args.stride / 4:
         raise ValueError('f1 must be below one-quarter of the capture sample rate')
     if args.duration_ms * 20 + 2 * EDGE * args.stride > 65534:
@@ -50,7 +53,8 @@ def load(txf):
             vals = np.deg2rad(vals)
         if name in ('mpos', 'opos'):
             vals = np.unwrap(vals)
-        if name in ('mpos', 'mvel'):
+        # mvel is already sign-corrected output-shaft velocity.
+        if name == 'mpos':
             vals /= GEAR_RATIO
         data[name] = vals
         intervals.append(tr['hscale'])
@@ -77,8 +81,9 @@ def prepare(txf, args):
         raise ValueError(f'{txf}: sample period does not match requested stride')
     ticks = args.duration_ms * 20 + 2 * EDGE * args.stride
     # Trace starts on the free-running decimation grid, and includes the
-    # first sample after the signal becomes inactive (board-drive.c).
-    minimum = (ticks + 1) // args.stride + 1
+    # first sample after the signal becomes inactive (board-drive.c). The
+    # capture stream can drop that closing sample; it lies outside the window.
+    minimum = (ticks + 1) // args.stride
     maximum = (ticks + args.stride) // args.stride + 1
     n = len(data['iq_cmd'])
     if not minimum <= n <= maximum:
@@ -88,18 +93,47 @@ def prepare(txf, args):
         raise ValueError(f'{txf}: baseline ovel RMS {rest:.6g} rad/s is not below {args.rest_threshold:g}')
     count = (args.duration_ms * 20 + args.stride - 1) // args.stride
     traces = np.stack([data[name][EDGE:EDGE + count] for name in SIGNALS])
-    traces -= traces.mean(axis=-1, keepdims=True)
+    t = np.arange(count)
+    slope, intercept = np.polyfit(t, traces.T, 1)
+    traces -= slope[:, None] * t + intercept[:, None]
     if not np.any(traces[0]):
         raise ValueError(f'{txf}: current command contains no excitation')
     return traces, dt
 
 
-def estimate(traces):
-    spectra = np.fft.rfft(traces, axis=-1)
+def tukey(n, alpha):
+    w = np.ones(n)
+    if alpha <= 0:
+        return w
+    x = np.arange(n) / (n - 1)
+    lo, hi = x < alpha / 2, x > 1 - alpha / 2
+    w[lo] = 0.5 * (1 + np.cos(2 * np.pi / alpha * (x[lo] - alpha / 2)))
+    w[hi] = 0.5 * (1 + np.cos(2 * np.pi / alpha * (x[hi] - 1 + alpha / 2)))
+    return w
+
+
+def estimate(traces, taper):
+    spectra = np.fft.rfft(traces * tukey(traces.shape[-1], taper), axis=-1)
     x, y = spectra[:1], spectra[1:]
     response = np.full(y.shape, np.nan, dtype=complex)
     np.divide(y, x, out=response, where=abs(x) > 0)
     return response
+
+
+def coherence(traces, dt):
+    # Welch estimate within one capture: 50%-overlap Hann segments.
+    length = 2 * traces.shape[-1] // (SEGMENTS + 1)
+    step = length // 2
+    starts = range(0, traces.shape[-1] - length + 1, step)
+    segments = np.stack([traces[:, i:i + length] for i in starts], axis=1)
+    spectra = np.fft.rfft(segments * np.hanning(length), axis=-1)
+    x, y = spectra[:1], spectra[1:]
+    pxx = np.mean(abs(x) ** 2, axis=1)
+    pyy = np.mean(abs(y) ** 2, axis=1)
+    pxy = np.mean(np.conj(x) * y, axis=1)
+    coh = np.full(pyy.shape, np.nan)
+    np.divide(abs(pxy) ** 2, pxx * pyy, out=coh, where=pxx * pyy > 0)
+    return np.fft.rfftfreq(length, dt), coh
 
 
 def plot(traces, dt, args, capture):
@@ -107,7 +141,9 @@ def plot(traces, dt, args, capture):
     matplotlib.use('Agg')
     import matplotlib.pyplot as plt
 
-    response = estimate(traces)
+    response = estimate(traces, args.taper)
+    coh_freq, coh = coherence(traces, dt)
+    coh_band = (coh_freq >= args.f0) & (coh_freq <= args.f1)
     freq = np.fft.rfftfreq(traces.shape[-1], dt)
     band = (freq >= args.f0) & (freq <= args.f1)
     if not np.any(band):
@@ -119,17 +155,17 @@ def plot(traces, dt, args, capture):
         valid = band & np.isfinite(response[i]) & (abs(response[i]) > 0)
         mag = np.full(freq.shape, np.nan)
         mag[valid] = 20 * np.log10(abs(response[i, valid]))
-        phase = np.full(freq.shape, np.nan)
-        phase[valid] = np.angle(response[i, valid], deg=True)
         axes[0].plot(freq[band], mag[band], label=f'{name} [{unit}]')
-        axes[1].plot(freq[band], phase[band], label=name)
+        axes[1].plot(coh_freq[coh_band], coh[i, coh_band], label=name)
     axes[0].set_title(f'{capture.name}: iq chirp {args.f0:g}–{args.f1:g} Hz, DC=0, {args.amplitude:g} A\n'
-                      f'{args.duration_ms} ms, stride {args.stride}, ratio {GEAR_RATIO:g}')
+                      f'{args.duration_ms} ms, stride {args.stride}, ratio {GEAR_RATIO:g}, '
+                      f'detrended, analysis taper {args.taper:g}')
     axes[0].set_ylabel('Response vs iq_cmd [dB]')
     axes[0].legend()
-    axes[1].set_ylabel('Phase [deg]')
+    axes[1].axhline(0.9, color='k', linestyle='--', linewidth=1)
+    axes[1].set_ylabel(f'Coherence ({SEGMENTS} seg)')
     axes[1].set_xlabel('f [Hz]')
-    axes[1].set_ylim(-180, 180)
+    axes[1].set_ylim(0, 1.05)
     for ax in axes:
         ax.set_xscale('log')
         ax.set_xlim(args.f0, args.f1)
@@ -152,6 +188,8 @@ def main():
     parser.add_argument('--stride', required=True, type=int)
     parser.add_argument('--delay', default=1.0, type=float)
     parser.add_argument('--rest-threshold', default=0.05, type=float)
+    parser.add_argument('--taper', default=0.0, type=float,
+                        help='Tukey fraction for the analysis-window FFT (default 0)')
     parser.add_argument('--output-dir', type=Path, help='directory for per-capture PNGs')
     parser.add_argument('--validate-settings', action='store_true')
     parser.add_argument('--signal-json', action='store_true', help='print the RTT chirp command')
@@ -175,7 +213,8 @@ def main():
             print(f'Validated {args.captures[0]}')
             return
         print(f'{args.repeats} repeats: {args.amplitude:g} A, {args.f0:g}–{args.f1:g} Hz, '
-              f'{args.duration_ms} ms, stride {args.stride}, log sweep, no taper, DC=0')
+              f'{args.duration_ms} ms, stride {args.stride}, log sweep, no taper, DC=0; '
+              f'analysis taper {args.taper:g}')
         if args.output_dir:
             args.output_dir.mkdir(parents=True, exist_ok=True)
         for path, (traces, dt) in zip(args.captures, prepared):
