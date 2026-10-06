@@ -10,6 +10,7 @@ Use `set-gains.sh` for gain conversion too.
 run-step.sh  [-i IP] [-r] [-F] mode step hold_ms [base] [stride] [prefix]
 run-ramp.sh  [-i IP] [-r] [-F] mode delta duration_ms [start] [stride] [prefix]
 run-sine.sh  [-i IP] [-r] [-F] mode freq_hz amp [cycles] [stride] [prefix]
+run-trace.sh [-i IP] [-r] {pos|vel|torque} [stride] [prefix]
 run-chirp.sh [-i IP] [-r] [--delay SEC] [--rest-threshold RAD_S] amplitude_A f0_hz f1_hz duration_ms repeats stride session_dir
 set-gains.sh [-i IP] vkp vki pkp pki [tqclim] [vellim]
 clear-faults.sh [-i IP] [-r]
@@ -26,6 +27,11 @@ clear-faults.sh [-i IP] [-r]
 - Total timeline, including pads, is limited to 65534 ticks at 20 kHz (~3.27 s).
   At stride 20: 3 cycles at 1 Hz, 2 at 0.75 Hz, 1 at 0.5 Hz.
   Pass the sine wrapper's printed realized frequency to the analyzer.
+- `run-trace.sh` captures three seconds with zero added command, using the
+  existing control mode (pos/vel/torque) to select a compatible trace trigger.
+  It does not select or change the mode; the selected mode must already match
+  the live drive mode. Default stride is 20 (1 kHz); output is
+  `<prefix>.NNNN.txf` in the current directory.
 - Raw `rtttest` position/velocity amplitudes use counts/counts per second,
   not radians. For tests without wrappers, consult
   `../module-fwpp/cheatsheet.md` and manage control mode and stopping yourself.
