@@ -13,12 +13,11 @@ and `sig1` fixed; do not fit or recommend changes to them. Treat values for
 those parameters from a full-model fit as fixed inputs, not tuning results.
 
 Use captures with recorded `mvel_filt`: the firmware's filtered motor velocity,
-sign-corrected and scaled into output-shaft rad/s. This is the friction input
-for `FRIC_SRC=2` with `FRIC_LPF=1` (no additional smoothing). Require updated
+sign-corrected and scaled into output-shaft rad/s. Require updated
 `TRACE=MECH` firmware and capture tables exposing that channel. Reject captures
 missing it; never substitute `ovel`, `vel_fbk`, raw `mvel`, or position-derived
-velocity. Do not apply another gear-ratio conversion. Identify with compensation
-disabled (omit `-F`); confirm `iq_fric` is zero when recorded.
+velocity. Do not apply another gear-ratio conversion. The firmware friction compensator
+was removed; capture with no `-c` ctrl flags.
 
 ## Steady-state map: Ic and sig2
 

@@ -18,7 +18,7 @@ Read `CLAUDE.md` and `cheatsheet.md` for hardware setup and capture limits.
    scripts/run-chirp.sh -i IP amplitude_A f0_hz f1_hz duration_ms repeats stride traces/session
 ```
    Use `-r` only if the RTT server needs starting. All repeats use the same
-   zero-DC logarithmic current chirp, without taper, in `0TQ` mode.
+   zero-DC logarithmic current chirp, without taper, with the cascade off (`FOC` mode).
 3. The wrapper zeros current and waits 1 second before each capture, checks
    baseline `ovel` RMS below 0.05 rad/s, and does not reposition. Override only
    when requested with `--delay SEC` and `--rest-threshold RAD_S` before the

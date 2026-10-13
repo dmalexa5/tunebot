@@ -48,7 +48,7 @@ cd "$SESSION"
 IN_FLIGHT=0
 zero_current(){
 	local failed=0
-	"$RTTTASK" -i "$IP" '{"command":"Jx_STATUS","action":"WRITE","mode":"0TQ"}' >/dev/null || failed=1
+	"$RTTTASK" -i "$IP" '{"command":"Jx_STATUS","action":"WRITE","mode":"FOC"}' >/dev/null || failed=1
 	"$RTTTASK" -i "$IP" '{"command":"Jx_IDQ","action":"WRITE","id":0,"iq":0,"mvel":0,"mpos":0}' >/dev/null || failed=1
 	return $failed
 }
@@ -64,7 +64,7 @@ stop_motion(){
 trap 'exit 130' INT TERM
 trap stop_motion EXIT
 
-"$RTTTASK" -i "$IP" $RFLAG '{"command":"Jx_STATUS","action":"WRITE","mode":"0TQ"}' >/dev/null
+"$RTTTASK" -i "$IP" $RFLAG '{"command":"Jx_STATUS","action":"WRITE","mode":"FOC"}' >/dev/null
 CAPTURES=()
 for (( trial=1; trial<=REPEATS; trial++ )); do
 	zero_current

@@ -8,15 +8,15 @@ description: Run ten fixed-frequency position tracking tests from 0.1 to 0.6 Hz 
 Use for `/test-tracking`. Read `CLAUDE.md` and `cheatsheet.md` for setup.
 
 1. Obtain missing target IP, new `traces/<session>/` directory, RTT server state,
-   and whether friction compensation should be enabled. Confirm OpenOCD is
+   and any extra ctrl flags (e.g. `VEL_USE_MENC`). Confirm OpenOCD is
    running; do not start it. Require `DEBUG=1`, `TRACE=MECH` firmware and non-zero
    servo gains. Do not change gains or sibling firmware.
 2. Ensure `.venv` has `requirements.txt` installed. Run from the repository root:
    ```sh
    .venv/bin/python scripts/test-tracking.py -i IP traces/session
    ```
-   Add `-r` only if the RTT server needs starting; add `-F` if compensation should
-   be enabled. Each mode write sets compensation according to this flag.
+   Add `-r` only if the RTT server needs starting; add `-c FLAG` per extra ctrl
+   bit. Each mode write sets `ENABLE` plus exactly these flags.
 3. Keep this test fixed: ten evenly spaced frequencies including 0.1 and 0.6 Hz,
    0.25 rad peak amplitude, 3 seconds per frequency, stride 20. The existing
    `signal_chirp` command with equal start/end frequencies generates each sine;

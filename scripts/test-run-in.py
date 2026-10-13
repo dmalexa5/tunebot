@@ -78,7 +78,7 @@ def capture(args):
 
     def zero():
         failed = False
-        for command in (dict(command='Jx_STATUS', action='WRITE', mode='0TQ'),
+        for command in (dict(command='Jx_STATUS', action='WRITE', mode='FOC'),
                         dict(command='Jx_IDQ', action='WRITE', id=0, iq=0, mvel=0, mpos=0)):
             try:
                 task(command)
@@ -89,15 +89,15 @@ def capture(args):
             raise RuntimeError('could not stop motion')
 
     def hold(iq_a):
-        # Raw Jx_IDQ in 0TQ: unclamped by VEL_TQC_LIM/the signal engine, only
+        # Raw Jx_IDQ with the cascade off: unclamped by VEL_TQC_LIM/the signal engine, only
         # FOC_I_TRIP limits it. No capture -- rtttrace never arms.
-        task(dict(command='Jx_STATUS', action='WRITE', mode='0TQ'))
+        task(dict(command='Jx_STATUS', action='WRITE', mode='FOC'))
         task(dict(command='Jx_IDQ', action='WRITE', id=0, iq=round(iq_a * 1000), mvel=0, mpos=0))
         time.sleep(HOLD_S)
 
     in_flight = False
     try:
-        task(dict(command='Jx_STATUS', action='WRITE', mode='0TQ'), args.restart)
+        task(dict(command='Jx_STATUS', action='WRITE', mode='FOC'), args.restart)
         for rep in range(1, REPEATS + 1):
             zero()
             print(f'Repeat {rep}/{REPEATS}: {HOLD_A} A hold, {HOLD_S} s each direction', flush=True)
@@ -108,7 +108,7 @@ def capture(args):
             zero()
             for findex, freq in enumerate(FREQUENCIES):
                 time.sleep(1)
-                task(dict(command='Jx_STATUS', action='WRITE', mode='POS'))
+                task(dict(command='Jx_STATUS', action='WRITE', ctrl='ENABLE', mode='POS'))
                 print(f'  {freq:g} Hz sine, {AMPLITUDE_RAD} rad', flush=True)
                 in_flight = True
                 subprocess.run([str(TOOLS / 'rtttest'), '-n', '-s', str(TABLES),

@@ -21,7 +21,7 @@ DEG_UNITS = ('°', '°/s')
 # the firmware's own names stay available too. An alias never overwrites a
 # trace the firmware publishes under that name: mech_trace now carries its own
 # vel_fbk -- the velocity the loop actually closes on, which is the *rotor*
-# side through a 500 Hz biquad when SERVO_FLAGS selects VEL_SRC_MENC, and only
+# side through a 500 Hz biquad when ctrl sets VEL_USE_MENC, and only
 # equals ovel in the default output-encoder configuration.
 FBK_ALIASES = {'opos': 'pos_fbk', 'ovel': 'vel_fbk'}
 

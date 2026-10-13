@@ -50,7 +50,7 @@ class TrackingTests(unittest.TestCase):
     def test_ten_fixed_frequencies_and_single_plot(self):
         with tempfile.TemporaryDirectory() as tmp:
             session = Path(tmp) / 'session'
-            args = SimpleNamespace(session=session, ip='mock', restart=True, friction=False)
+            args = SimpleNamespace(session=session, ip='mock', restart=True, ctrl=[])
             calls = []
 
             def run(command, **kwargs):
@@ -83,7 +83,7 @@ class TrackingTests(unittest.TestCase):
     def test_failure_stops_and_waits_for_waveform(self):
         with tempfile.TemporaryDirectory() as tmp:
             args = SimpleNamespace(session=Path(tmp) / 'session', ip='mock',
-                                   restart=False, friction=False)
+                                   restart=False, ctrl=[])
             calls = []
 
             def run(command, **kwargs):

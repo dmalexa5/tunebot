@@ -14,7 +14,7 @@ function [data, dt] = txf_load(txfDir)
 %   alias never overwrites a trace the firmware publishes under that name:
 %   mech_trace now carries its own vel_fbk -- the velocity the loop actually
 %   closes on, which is the rotor side through a 500 Hz biquad when
-%   SERVO_FLAGS selects VEL_SRC_MENC, and only equals ovel in the default
+%   ctrl sets VEL_USE_MENC, and only equals ovel in the default
 %   output-encoder configuration.
 
 meta = jsondecode(fileread(fullfile(txfDir, 'metadata.json')));

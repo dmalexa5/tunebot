@@ -1,12 +1,13 @@
 #!/bin/zsh
-# run-sine.sh [-i IP] [-r] [-F] mode freq_hz amp [cycles] [stride] [prefix]
+# run-sine.sh [-i IP] [-r] [-c FLAG]... mode freq_hz amp [cycles] [stride] [prefix]
 #   mode: pos | vel | torque
 #   amp units: rad (pos), rad/s (vel), A (torque)
-#   -F: keep FEATURE_FRIC_COMP set when selecting the mode
+#   -c FLAG: extra Jx_STATUS ctrl bit to set with the mode (repeatable),
+#            e.g. VEL_USE_MENC; every mode write replaces the whole ctrl word
 # Selects the FOC control mode, runs a signal_sine (rtttest) of `cycles` whole
-# cycles on the matching command, then returns the joint to 0TQ. Writes
-# <prefix>.NNNN.txf in the current directory. See module-fwpp/cheatsheet.md
-# "Signal injection (rtttest signal_*)".
+# cycles on the matching command, then returns the joint to FOC
+# (cascade disabled). Writes <prefix>.NNNN.txf in the current directory. See
+# module-fwpp/cheatsheet.md "Signal injection (rtttest signal_*)".
 set -e
 
 SCRIPT_DIR=${0:A:h}
@@ -15,8 +16,9 @@ RTTTASK=$SCRIPT_DIR/../../module-fwpp/tools/rttcmd/rtttask
 TABLES=$SCRIPT_DIR/../../module-fwpp/output/drive/none/drive-none.tables.json
 
 # The servo loop speaks output-shaft counts (2^32/rev) and counts/s --
-# "radians appear nowhere" (module-fwpp src/servo.h). pos/vel arguments are
-# rad/rad-per-s and get converted here; torque is amps and passes through.
+# "radians appear nowhere" (module-fwpp src/drive-control.h vel_fbk).
+# pos/vel arguments are rad/rad-per-s and get converted here; torque is amps
+# and passes through.
 RAD_TO_CNT=$(( 4294967296.0 / (2 * 3.14159265358979324) ))
 to_cmd(){   # scales by $SCALE, which the mode case below sets
 	if [[ $SCALE == 1 ]]; then print -- $1; else printf %.0f $(( $1 * SCALE )); fi
@@ -33,12 +35,13 @@ TICKS_MAX=65534
 
 IP=127.0.0.1
 RFLAG=()
-FRIC=
+CTRL=()
+FEAT_JSON=
 while [[ "$1" == -* ]]; do
 	case "$1" in
 		-i) IP=$2; shift 2 ;;
 		-r) RFLAG=(-r); shift ;;
-		-F) FRIC='"ctrl":"FEATURE_FRIC_COMP",'; shift ;;
+		-c) CTRL+=($2); shift 2 ;;
 		*) echo "unknown flag: $1" >&2; exit 1 ;;
 	esac
 done
@@ -48,10 +51,10 @@ FREQ_HZ=$2
 CYCLES=${4:-2}
 
 case "$MODE_NAME" in
-	torque) FOC_MODE=0TQ; SIGNAL=iq;  SCALE=1;           DEFAULT_STRIDE=1;  DEFAULT_PREFIX=tsine ;;
+	torque) FOC_MODE=FOC; SIGNAL=iq;  SCALE=1;           DEFAULT_STRIDE=1;  DEFAULT_PREFIX=tsine ;;
 	vel)    FOC_MODE=VEL; SIGNAL=vel; SCALE=$RAD_TO_CNT; DEFAULT_STRIDE=12; DEFAULT_PREFIX=vsine ;;
 	pos)    FOC_MODE=POS; SIGNAL=pos; SCALE=$RAD_TO_CNT; DEFAULT_STRIDE=20; DEFAULT_PREFIX=psine ;;
-	*) echo "usage: run-sine.sh [-i IP] [-r] [-F] {pos|vel|torque} freq_hz amp [cycles] [stride] [prefix]" >&2; exit 1 ;;
+	*) echo "usage: run-sine.sh [-i IP] [-r] [-c FLAG]... {pos|vel|torque} freq_hz amp [cycles] [stride] [prefix]" >&2; exit 1 ;;
 esac
 AMP=$(to_cmd $3)
 STRIDE=${5:-$DEFAULT_STRIDE}
@@ -79,20 +82,27 @@ print -u2 -- "run-sine.sh: period ${PERIOD} ticks -> $(printf %.6g $(( 1.0 * SER
 
 # The signal tests neither select a mode nor stop the joint when they finish
 # (the old servo_* tests did both). Leaving VEL/POS enabled means the joint
-# keeps servoing after the capture, so drop to 0TQ on every exit path.
+# keeps servoing after the capture, so drop to FOC with the cascade
+# disabled on every exit path.
 STOPPED=0
 stop_motion(){
 	if (( STOPPED )); then return 0; fi
 	STOPPED=1
-	"$RTTTASK" -i "$IP" '{"command":"Jx_STATUS","action":"WRITE","mode":"0TQ"}' >/dev/null 2>&1 || true
-	# 0TQ disables the cascade but leaves the direct current command intact.
+	# Keep the -c flags: changing VEL_USE_MENC while enabled is refused (CTRL_BUSY).
+	"$RTTTASK" -i "$IP" "{\"command\":\"Jx_STATUS\",\"action\":\"WRITE\",\"ctrl\":[$FEAT_JSON],\"mode\":\"FOC\"}" >/dev/null 2>&1 || true
+	# Clearing ENABLE disables the cascade but leaves the direct current
+	# command intact.
 	"$RTTTASK" -i "$IP" '{"command":"Jx_IDQ","action":"WRITE","id":0,"iq":0,"mvel":0,"mpos":0}' >/dev/null 2>&1 || true
 }
 trap 'stop_motion; exit 130' INT TERM
 trap stop_motion EXIT
 
+# Torque injection needs the cascade off; vel/pos need it ENABLEd in their mode.
+for flag in $CTRL; do FEAT_JSON+="${FEAT_JSON:+,}\"$flag\""; done
+CTRL_JSON=$FEAT_JSON
+[[ $FOC_MODE != FOC ]] && CTRL_JSON="\"ENABLE\"${FEAT_JSON:+,}$FEAT_JSON"
 "$RTTTASK" -i "$IP" $RFLAG \
-	"{\"command\":\"Jx_STATUS\",\"action\":\"WRITE\",${FRIC}\"mode\":\"$FOC_MODE\"}" >/dev/null
+	"{\"command\":\"Jx_STATUS\",\"action\":\"WRITE\",\"ctrl\":[$CTRL_JSON],\"mode\":\"$FOC_MODE\"}" >/dev/null
 
 "$RTTTEST" -n -s "$TABLES" -i "$IP" -o "$PREFIX" \
 	"{\"test\":\"signal_sine\",\"signal\":\"$SIGNAL\",\"amplitude\":$AMP,\"period\":$PERIOD,\"ncycles\":$CYCLES,\"start_pad\":$PAD,\"end_pad\":$PAD,\"decimation\":$STRIDE}"

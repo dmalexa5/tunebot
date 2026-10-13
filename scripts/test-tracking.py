@@ -86,7 +86,8 @@ def capture(args):
 
     def zero():
         failed = False
-        for command in (dict(command='Jx_STATUS', action='WRITE', mode='0TQ'),
+        # Keep the -c flags: changing VEL_USE_MENC while enabled is refused.
+        for command in (dict(command='Jx_STATUS', action='WRITE', ctrl=args.ctrl, mode='FOC'),
                         dict(command='Jx_IDQ', action='WRITE', id=0, iq=0, mvel=0, mpos=0)):
             try:
                 task(command)
@@ -98,14 +99,11 @@ def capture(args):
 
     in_flight = False
     try:
-        task(dict(command='Jx_STATUS', action='WRITE', mode='0TQ'), args.restart)
+        task(dict(command='Jx_STATUS', action='WRITE', mode='FOC'), args.restart)
         for trial, frequency in enumerate(FREQUENCIES, 1):
             zero()
             time.sleep(1)
-            mode = dict(command='Jx_STATUS', action='WRITE', mode='POS')
-            if args.friction:
-                mode['ctrl'] = 'FEATURE_FRIC_COMP'
-            task(mode)
+            task(dict(command='Jx_STATUS', action='WRITE', ctrl=['ENABLE', *args.ctrl], mode='POS'))
             print(f'Test {trial}/10: {frequency:.6f} Hz, 0.25 rad, 3 s', flush=True)
             in_flight = True
             subprocess.run([str(TOOLS / 'rtttest'), '-n', '-s', str(TABLES),
@@ -130,7 +128,8 @@ def main():
     parser.add_argument('session', type=Path, help='new traces/session directory')
     parser.add_argument('-i', '--ip', default='127.0.0.1')
     parser.add_argument('-r', '--restart', action='store_true', help='start RTT server')
-    parser.add_argument('-F', '--friction', action='store_true', help='enable friction compensation')
+    parser.add_argument('-c', '--ctrl', action='append', default=[],
+                        help='extra Jx_STATUS ctrl bit, e.g. VEL_USE_MENC (repeatable)')
     parser.add_argument('--analyze', action='store_true', help='plot an existing session without hardware')
     args = parser.parse_args()
     args.session = args.session.resolve()

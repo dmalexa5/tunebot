@@ -19,8 +19,8 @@ Use for `/test-run-in`. Read `CLAUDE.md` and `cheatsheet.md` for setup.
    .venv/bin/python scripts/test-run-in.py -i IP traces/session
    ```
    Add `-r` only if the RTT server needs starting.
-3. Keep this test fixed: 5 repeats, each a 20 s, 3 A torque hold in `0TQ` in
-   the positive direction, then the negative, with no capture, followed by
+3. Keep this test fixed: 5 repeats, each a 20 s, 3 A torque hold with the cascade off
+   (`FOC` mode) in the positive direction, then the negative, with no capture, followed by
    three POS-mode sine captures at 0.5, 1, and 2 Hz, 0.138 rad amplitude.
    Holds write raw `Jx_IDQ` current directly -- unclamped by `VEL_TQC_LIM`
    or the signal engine, limited only by `FOC_I_TRIP`. Sines use the

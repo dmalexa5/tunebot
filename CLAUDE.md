@@ -10,7 +10,7 @@ MATLAB LuGre fits require Optimization Toolbox.
 ## Setup
 
 - Sibling `../module-fwpp` supplies RTT tools, tables, and firmware.
-  Its `cheatsheet.md` documents the raw protocol; `src/servo.c` implements the PID cascade.
+  Its `cheatsheet.md` documents the raw protocol; `src/drive-control.c` implements the PID cascade.
 - Before hardware tests, confirm OpenOCD is running; do not start it yourself.
   Use `DEBUG=1`, `TRACE=MECH` firmware and verify non-zero servo gains.
 - Run `source env.zsh` for script access; run `startup.m` in MATLAB for its MCP server.
