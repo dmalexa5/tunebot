@@ -21,9 +21,9 @@ clear-faults.sh [-i IP] [-r]
   Use `-r` only on the first invocation if the RTT server needs starting.
 - `base`/`start` must be zero. Default stride: torque 1, vel 12, pos 20.
   Raise stride if captures overflow or truncate.
-- Wrappers select the control mode (`ENABLE` + `VEL`/`POS`; torque uses `FOC`
-  with the cascade off) and attempt to return to `FOC`, cascade off, on exit.
-  Torque commands raw `iq`; only `FOC_I_TRIP` limits it, not `VEL_TQC_LIM`.
+- Wrappers select the control mode (`ENABLE` + `FOC`/`VEL`/`POS`) and attempt
+  to return to `FOC`, cascade off, on exit. The torque signal rides the vel
+  stage's torque feedforward (no PID in `FOC`), so `VEL_TQC_LIM` clamps it.
 - Mode writes replace the whole ctrl word. `-c FLAG` (repeatable) adds a ctrl
   bit such as `VEL_USE_MENC` or `VEL_GAIN_SCHED`; flags are kept on exit because
   firmware refuses a `VEL_USE_MENC` change while enabled.
@@ -53,7 +53,7 @@ over the entire driven window, including startup, in mrad versus Hz. Replot with
 
 Chirp tests use `.venv/bin/python` with `requirements.txt` installed. Use a new
 `traces/<session>/` directory and at least two repeats. The wrapper captures
-identical zero-DC, constant-amplitude logarithmic `iq` chirps with the cascade off, checks
+identical zero-DC, constant-amplitude logarithmic `iq` chirps in enabled `FOC` mode, checks
 baseline rest, and stops on invalid captures. Keep `f1_hz` below one-quarter of
 `20000 / stride`; pads and chirp must fit 65534 ticks. Stride 2 truncates the
 `TRACE=MECH` stream; use 4 or more, which caps `f1_hz` near 1250 Hz. It saves

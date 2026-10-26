@@ -68,6 +68,8 @@ trap stop_motion EXIT
 CAPTURES=()
 for (( trial=1; trial<=REPEATS; trial++ )); do
 	zero_current
+	# The iq signal rides the vel stage feedforward, which needs ENABLE.
+	"$RTTTASK" -i "$IP" '{"command":"Jx_STATUS","action":"WRITE","ctrl":["ENABLE"],"mode":"FOC"}' >/dev/null
 	sleep "$DELAY"
 	PREFIX=$(printf 'chirp-%03d' "$trial")
 	IN_FLIGHT=1

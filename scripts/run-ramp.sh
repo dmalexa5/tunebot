@@ -91,17 +91,14 @@ stop_motion(){
 	STOPPED=1
 	# Keep the -c flags: changing VEL_USE_MENC while enabled is refused (CTRL_BUSY).
 	"$RTTTASK" -i "$IP" "{\"command\":\"Jx_STATUS\",\"action\":\"WRITE\",\"ctrl\":[$FEAT_JSON],\"mode\":\"FOC\"}" >/dev/null 2>&1 || true
-	# Clearing ENABLE disables the cascade but leaves the direct current
-	# command intact.
 	"$RTTTASK" -i "$IP" '{"command":"Jx_IDQ","action":"WRITE","id":0,"iq":0,"mvel":0,"mpos":0}' >/dev/null 2>&1 || true
 }
 trap 'stop_motion; exit 130' INT TERM
 trap stop_motion EXIT
 
-# Torque injection needs the cascade off; vel/pos need it ENABLEd in their mode.
+# Every mode needs ENABLE: torque injection rides the vel stage feedforward.
 for flag in $CTRL; do FEAT_JSON+="${FEAT_JSON:+,}\"$flag\""; done
-CTRL_JSON=$FEAT_JSON
-[[ $FOC_MODE != FOC ]] && CTRL_JSON="\"ENABLE\"${FEAT_JSON:+,}$FEAT_JSON"
+CTRL_JSON="\"ENABLE\"${FEAT_JSON:+,}$FEAT_JSON"
 "$RTTTASK" -i "$IP" $RFLAG \
 	"{\"command\":\"Jx_STATUS\",\"action\":\"WRITE\",\"ctrl\":[$CTRL_JSON],\"mode\":\"$FOC_MODE\"}" >/dev/null
 
