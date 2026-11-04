@@ -10,9 +10,10 @@ Use `set-gains.sh` for gain conversion too.
 run-step.sh  [-i IP] [-r] [-c FLAG]... mode step hold_ms [base] [stride] [prefix]
 run-ramp.sh  [-i IP] [-r] [-c FLAG]... mode delta duration_ms [start] [stride] [prefix]
 run-sine.sh  [-i IP] [-r] [-c FLAG]... mode freq_hz amp [cycles] [stride] [prefix]
+run-tqc.sh   [-i IP] [-r] [-c FLAG]... freq_hz amp [cycles] [stride] [prefix]   # POS via pos_cmd_set @500 Hz, amp*(1-cos)
 run-trace.sh [-i IP] [-r] {pos|vel|torque} [stride] [prefix]
 run-chirp.sh [-i IP] [-r] [--delay SEC] [--rest-threshold RAD_S] amplitude_A f0_hz f1_hz duration_ms repeats stride session_dir
-set-gains.sh [-i IP] vkp vki pkp pki [tqclim] [vellim]
+set-gains.sh [-i IP] vkp vki pkp pki [tqclim] [vellim] # tunables units: A/(deg/s), 1/s, A, deg/s
 clear-faults.sh [-i IP] [-r]
 .venv/bin/python scripts/test-tracking.py [-i IP] [-r] [-c FLAG]... traces/session
 ```
