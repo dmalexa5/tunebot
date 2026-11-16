@@ -8,4 +8,5 @@ for tunebot_script in "$tunebot_scripts_dir"/*.sh(N); do
   alias "${tunebot_script:t:r}=${(q)tunebot_script}"
 done
 alias "set-menc-default=${(q)tunebot_scripts_dir}/set-menc-default"
+alias "menc-calibration=${(q)tunebot_scripts_dir:h}/.venv/bin/python ${(q)tunebot_scripts_dir}/menc-calibration.py"
 unset tunebot_script tunebot_scripts_dir

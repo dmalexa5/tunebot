@@ -1,5 +1,6 @@
 #!/bin/zsh
-# [TRACE=ILOOP] menc-flash.sh [-i IP] -- build drive DEBUG TRACE=${TRACE:-MECH} from ../module-fwpp,
+# [TRACE=ILOOP] [BOARD_ID=N] menc-flash.sh [-i IP] -- build drive DEBUG TRACE=${TRACE:-MECH}
+# BOARD_ID=${BOARD_ID:-0} from ../module-fwpp,
 # gdb-load it on the remote openocd, reset, re-attach RTT at the new control
 # block, bring the power stage up, and check the boot log for menc errors.
 set -e
@@ -9,7 +10,7 @@ FW=${0:A:h}/../../module-fwpp
 RTT=$FW/tools/rttcmd
 ELF=$FW/output/drive/none/drive-none.elf
 
-make -C "$FW" build BOARD=drive BANK=none DEBUG=1 TRACE=${TRACE:-MECH} -j16 >/tmp/menc-build.$$ 2>&1 \
+make -C "$FW" build BOARD=drive BANK=none DEBUG=1 TRACE=${TRACE:-MECH} BOARD_ID=${BOARD_ID:-0} -j16 >/tmp/menc-build.$$ 2>&1 \
 	|| { tail -30 /tmp/menc-build.$$; exit 1; }
 [[ $(jq -r .rtttrace.name "$FW/output/drive/none/drive-none.tables.json") == ${${TRACE:-MECH}:l}_trace || ${TRACE:-MECH} == ILOOP ]] \
 	|| { echo "tables.json does not match TRACE" >&2; exit 1; }

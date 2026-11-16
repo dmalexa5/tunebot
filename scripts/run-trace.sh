@@ -1,6 +1,6 @@
 #!/bin/zsh
-# run-trace.sh [-i IP] [-r] mode [stride] [prefix]
-# Capture 3 seconds of the selected drive-board trace set without changing the
+# run-trace.sh [-i IP] [-r] mode [stride] [prefix] [duration_ms]
+# Capture duration_ms (default 3000) of the selected drive-board trace set without changing the
 # control mode or applying a nonzero signal. The zero-step signal arms RTTTrace.
 set -e
 
@@ -8,9 +8,8 @@ SCRIPT_DIR=${0:A:h}
 RTTTEST=$SCRIPT_DIR/../../module-fwpp/tools/rttcmd/rtttest
 TABLES=$SCRIPT_DIR/../../module-fwpp/output/drive/none/drive-none.tables.json
 
-# Signal-test timeline is in 20 kHz servo ticks. Three seconds is 60000 ticks;
+# Signal-test timeline is in 20 kHz servo ticks (uint16: at most 3276 ms);
 # default stride 20 keeps the trace stream at 1 kHz and within RTT throughput.
-DURATION=60000
 IP=127.0.0.1
 RFLAG=()
 while [[ "$1" == -* ]]; do
@@ -21,8 +20,8 @@ while [[ "$1" == -* ]]; do
 	esac
 done
 
-if (( $# < 1 || $# > 3 )); then
-	echo "usage: run-trace.sh [-i IP] [-r] {pos|vel|torque} [stride] [prefix]" >&2
+if (( $# < 1 || $# > 4 )); then
+	echo "usage: run-trace.sh [-i IP] [-r] {pos|vel|torque} [stride] [prefix] [duration_ms]" >&2
 	exit 1
 fi
 MODE=$1
@@ -34,6 +33,11 @@ case "$MODE" in
 esac
 STRIDE=${2:-20}
 PREFIX=${3:-$DEFAULT_PREFIX}
+DURATION=$(( ${4:-3000} * 20 ))
+if (( DURATION < 1 || DURATION > 65534 )); then
+	echo "run-trace.sh: duration_ms must be between 1 and 3276" >&2
+	exit 1
+fi
 if (( STRIDE < 1 || STRIDE > 255 )); then
 	echo "run-trace.sh: stride must be between 1 and 255" >&2
 	exit 1

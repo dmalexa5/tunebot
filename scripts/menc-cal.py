@@ -175,6 +175,7 @@ def bct(a):
 		ax.set_xlabel("2fe sin [deg]"); ax.set_ylabel("2fe cos [deg]"); ax.grid(alpha=0.3); ax.legend(fontsize=8)
 		ax.set_title("BCT slope (gray: individual captures incl. motion)")
 		fig.tight_layout(); fig.savefig(a.png, dpi=100); print("wrote", a.png)
+	return n
 
 def corr(a):
 	F = json.load(open(a.fit))
@@ -193,6 +194,7 @@ def corr(a):
 	out = Path(a.fit).with_name(Path(a.fit).name.replace(".fit.json", "-corr.json"))
 	json.dump({"corr": q.tolist(), "from": a.fit, "kmin": a.kmin, "kmax": a.kmax, "cmd_dE": cj(dE)}, open(out, "w"))
 	print("CORR", q.tolist()); print("max |corr|", np.abs(q).max(), "LSB; wrote", out)
+	return out
 
 def gain(a):
 	B, A = json.load(open(a.before)), json.load(open(a.after))
