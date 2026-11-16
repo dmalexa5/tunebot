@@ -9,9 +9,10 @@ of that direction) -- E_k is the speed-independent (encoder) part, M_k the real
 rotor motion from torque ripple. Encoder estimate = mean of E_k over directions;
 the half-difference is reported as its direction uncertainty.
 
-  menc-cal.py fit LABEL CAP.txf...            -> LABEL.fit.json, LABEL.fit.png
+  menc-cal.py fit [-i IP] LABEL CAP.txf...    -> LABEL.fit.json, LABEL.fit.png
+      (BCT/CORR in effect are read from the bench via menc-trim.py)
   menc-cal.py bct A.fit.json B.fit.json       -> BCT slope + null (A,B carry "bct")
-  menc-cal.py corr FIT.json [--gain G.json] [--kmax 6] -> FIT-corr.json
+  menc-cal.py corr FIT.json [--gain G.json] [--kmin 1] [--kmax 6] -> FIT-corr.json
   menc-cal.py gain BEFORE.fit.json AFTER.fit.json     -> measured CORR response
   menc-cal.py compare LABEL A.fit.json B.fit.json...  -> LABEL.png before/after
 
@@ -27,7 +28,7 @@ import matplotlib.pyplot as plt
 
 KMAX = 12
 LSB = 360.0 / 4096.0
-SET = Path(__file__).with_name("menc-set.py")
+TRIM = Path(__file__).with_name("menc-trim.py")
 
 def load(d):
 	meta = json.load(open(d + "/metadata.json"))
@@ -68,7 +69,7 @@ def jc(l): return np.array([a + 1j * b for a, b in l])
 
 def fit(a):
 	caps = [capture(d) for d in a.caps]
-	st = json.loads(subprocess.check_output([sys.executable, str(SET), "--show"]))
+	st = json.loads(subprocess.check_output([sys.executable, str(TRIM), "-i", a.ip, "show"]))
 	out = dict(label=a.label, bct=st["bct"], corr=st["corr"], caps=[], dirs={})
 	for dname, sel in (("f", lambda c: c["fe"] > 0), ("r", lambda c: c["fe"] < 0)):
 		cs = [c for c in caps if sel(c)]
@@ -185,12 +186,12 @@ def corr(a):
 		g = np.sinc(np.arange(1, KMAX + 1) / 32) ** 2 + 0j
 	th = np.arange(32) * 2 * np.pi / 32
 	# command: cancel the encoder harmonics 1..kmax (CORR adds to the output)
-	dE = np.zeros(KMAX, complex); dE[:a.kmax] = -E[:a.kmax] / g[:a.kmax]
+	dE = np.zeros(KMAX, complex); dE[a.kmin - 1:a.kmax] = -E[a.kmin - 1:a.kmax] / g[a.kmin - 1:a.kmax]
 	base = np.array(F["corr"], float)
 	new = base + synth(dE, th) / LSB
 	q = np.clip(np.round(new), -128, 127).astype(int)
 	out = Path(a.fit).with_name(Path(a.fit).name.replace(".fit.json", "-corr.json"))
-	json.dump({"corr": q.tolist(), "from": a.fit, "kmax": a.kmax, "cmd_dE": cj(dE)}, open(out, "w"))
+	json.dump({"corr": q.tolist(), "from": a.fit, "kmin": a.kmin, "kmax": a.kmax, "cmd_dE": cj(dE)}, open(out, "w"))
 	print("CORR", q.tolist()); print("max |corr|", np.abs(q).max(), "LSB; wrote", out)
 
 def gain(a):
@@ -226,9 +227,9 @@ def compare(a):
 
 def main():
 	ap = argparse.ArgumentParser(); sp = ap.add_subparsers(dest="cmd", required=True)
-	p = sp.add_parser("fit"); p.add_argument("label"); p.add_argument("caps", nargs="+"); p.set_defaults(f=fit)
+	p = sp.add_parser("fit"); p.add_argument("-i", dest="ip", default="127.0.0.1"); p.add_argument("label"); p.add_argument("caps", nargs="+"); p.set_defaults(f=fit)
 	p = sp.add_parser("bct"); p.add_argument("a"); p.add_argument("b"); p.add_argument("--png"); p.set_defaults(f=bct)
-	p = sp.add_parser("corr"); p.add_argument("fit"); p.add_argument("--gain"); p.add_argument("--kmax", type=int, default=6); p.set_defaults(f=corr)
+	p = sp.add_parser("corr"); p.add_argument("fit"); p.add_argument("--gain"); p.add_argument("--kmax", type=int, default=6); p.add_argument("--kmin", type=int, default=1); p.set_defaults(f=corr)
 	p = sp.add_parser("gain"); p.add_argument("before"); p.add_argument("after"); p.add_argument("out"); p.set_defaults(f=gain)
 	p = sp.add_parser("compare"); p.add_argument("label"); p.add_argument("fits", nargs="+"); p.set_defaults(f=compare)
 	a = ap.parse_args(); a.f(a)

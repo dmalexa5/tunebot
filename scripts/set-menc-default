@@ -1,0 +1,69 @@
+#!/usr/bin/env python3
+"""set-menc-default -- upload a joint's default MA600A trim (BCT, CORR0..31).
+
+  set-menc-default [-i IP] --joint N
+
+The defaults are the pre-tune baseline for each joint, taken from the
+module-fwpp tune commits named in DEFAULTS. Sequence: drive to HIZ, Jx_CFG
+WRITE the trim (chip shadow registers only), read it back, then power stage
+back ON in FOC mode (current loop left disabled). It never SAVEs: nothing
+reaches the MA600A NVM, so the trim is lost at the next power cycle.
+"""
+import argparse, json, subprocess, sys, time
+from pathlib import Path
+
+RTT = Path(__file__).resolve().parents[2] / "module-fwpp/tools/rttcmd/rtttask"
+
+# CORR bytes as written to the chip (signed, LSB 360/4096 deg).
+DEFAULTS = {
+	# module-fwpp b9777ba "tune: eng-0001 j0 menc"
+	0: {"bct": 43, "corr": bytes.fromhex(
+		"EFF3F8FBFEFF02070E12120D05FBF2EC"
+		"ECEFF4F8FCFE0209111616110900F6F0")},
+	# module-fwpp 7450e65 "tune: eng-0001 j1"
+	1: {"bct": 40, "corr": bytes.fromhex(
+		"E3E8F1FC040A0E131717150E04F7EDE6"
+		"E4E8F0F902080E121718160D02F6EBE3")},
+}
+
+def task(ip, req):
+	r = json.loads(subprocess.check_output([str(RTT), "-i", ip, json.dumps(req)]))
+	if r.get("action") == "ERR":
+		sys.exit(f"{req} -> {r}")
+	return r
+
+def cfg(ip, action, addr, val=0):
+	return task(ip, {"command": "Jx_CFG", "action": action, "addr": addr, "val": val})["data"]["val"]
+
+def main():
+	ap = argparse.ArgumentParser()
+	ap.add_argument("-i", dest="ip", default="127.0.0.1")
+	ap.add_argument("--joint", type=int, required=True, choices=sorted(DEFAULTS))
+	a = ap.parse_args()
+	bct, corr = DEFAULTS[a.joint]["bct"], DEFAULTS[a.joint]["corr"]
+
+	# 1) HIZ
+	st = task(a.ip, {"command": "Jx_STATUS", "action": "WRITE", "ctrl": ["SET_HIZ"], "mode": "FOC"})
+	if st["data"]["outp"] != "HIZ":
+		sys.exit(f"drive not in HIZ: {st}")
+
+	# 2) WRITE the trim, then read it back
+	cfg(a.ip, "WRITE", "MA600A_REG_BCT", bct)
+	for i, v in enumerate(corr):
+		cfg(a.ip, "WRITE", "MA600A_REG_CORR", (i << 8) | v)
+	got_bct = cfg(a.ip, "READ", "MA600A_REG_BCT")
+	got_corr = bytes(cfg(a.ip, "READ", "MA600A_REG_CORR", i << 8) & 0xFF for i in range(32))
+	if got_bct != bct or got_corr != corr:
+		sys.exit(f"readback mismatch (drive left in HIZ): bct {got_bct}, corr {got_corr.hex().upper()}")
+
+	# 3) FOC: power stage back on (hiz -> brake -> on)
+	task(a.ip, {"command": "Jx_STATUS", "action": "WRITE", "ctrl": ["CLR_FAULT"], "mode": "FOC"})
+	time.sleep(1)
+	st = task(a.ip, {"command": "Jx_STATUS", "action": "READ"})
+	if st["data"]["outp"] != "ON":
+		sys.exit(f"power stage not ON: {st}")
+
+	print(f"joint {a.joint}: BCT {bct}, CORR {corr.hex().upper()} written (not saved); {st['data']}")
+
+if __name__ == "__main__":
+	main()
