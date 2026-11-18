@@ -4,6 +4,10 @@
 # Jx_STATUS ctrl=CLR_FAULT (rtttask) and prints the resulting status word.
 # See module-fwpp/cheatsheet.md "FOC current-loop PID" section for the
 # Jx_STATUS/Jx_CFG command shapes.
+# The clear must be a WRITE (a bare Jx_STATUS is a READ and ignores ctrl).
+# A write replaces the whole ctrl word, so this also drops ENABLE and any
+# feature flags and selects FOC: the joint stays disabled after the clear
+# instead of re-enabling on its own.
 set -e
 
 SCRIPT_DIR=${0:A:h}
@@ -19,4 +23,7 @@ while [[ "$1" == -* ]]; do
 	esac
 done
 
-"$RTTTASK" -i "$IP" $RFLAG '{"command":"Jx_STATUS","ctrl":"CLR_FAULT"}'
+"$RTTTASK" -i "$IP" $RFLAG '{"command":"Jx_STATUS","action":"WRITE","ctrl":["CLR_FAULT"],"mode":"FOC"}' >/dev/null
+# The write's reply predates the power-stage restart; read back once it settles
+sleep 0.2
+"$RTTTASK" -i "$IP" '{"command":"Jx_STATUS","action":"READ"}'
